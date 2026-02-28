@@ -1,32 +1,120 @@
 const Alert = require('../models/Alert');
+const alertService = require('../services/alertService');
 
-// CREATE NEW ALERT (from AI system)
+// CREATE ALERT FROM DETECTION (with threshold-based routing)
+// This is the main entry point for alerts from the vision engine
+exports.createAlertFromDetection = async (req, res) => {
+  try {
+    const detectionData = req.body;
+
+    console.log(`📥 Received detection: Track ${detectionData.track_id}, Risk ${detectionData.risk_score}`);
+
+    // Process through alert service (handles fast-path vs LLM-path routing)
+    const alert = await alertService.processDetection(detectionData, req.io);
+
+    if (!alert) {
+      // Below threshold - no alert created
+      return res.json({
+        success: true,
+        message: 'Detection processed, no alert created (below threshold)',
+        data: null
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Alert created successfully',
+      data: alert,
+      path: alert.risk_score >= 85 ? 'fast-path' : 'llm-path'
+    });
+
+  } catch (error) {
+    console.error('Error creating alert from detection:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// CREATE ALERT FROM LLM (when LLM has already processed)
+// Used when vision engine sends pre-analyzed alerts
+exports.createAlertFromLLM = async (req, res) => {
+  try {
+    const llmAlertData = req.body;
+
+    console.log(`📥 Received LLM-analyzed alert: Track ${llmAlertData.track_id}`);
+
+    const alert = await alertService.createFromLLM(llmAlertData, req.io);
+
+    res.status(201).json({
+      success: true,
+      message: 'LLM alert created successfully',
+      data: alert
+    });
+
+  } catch (error) {
+    console.error('Error creating LLM alert:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// CREATE FAST-PATH ALERT (emergency bypass)
+// Direct route for critical alerts that bypass all processing
+exports.createFastPathAlert = async (req, res) => {
+  try {
+    const detectionData = req.body;
+
+    console.log(`⚡ EMERGENCY: Fast-path alert for Track ${detectionData.track_id}`);
+
+    const alert = await alertService.createFastPathAlert(detectionData, req.io);
+
+    res.status(201).json({
+      success: true,
+      message: 'Fast-path alert created',
+      data: alert,
+      priority: 'critical'
+    });
+
+  } catch (error) {
+    console.error('Error creating fast-path alert:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// LEGACY: CREATE NEW ALERT (from AI system) - kept for backwards compatibility
 exports.createAlert = async (req, res) => {
   try {
     const alertData = req.body;
-    
+
     // Create new alert document
     const alert = new Alert(alertData);
     await alert.save();
-    
+
     console.log(`✅ New alert saved: ${alert.alert_id}`);
-    
+
     // Emit to all connected WebSocket clients
     req.io.emit('new_alert', {
       type: 'new_alert',
       data: {
         ...alert.toObject(),
-        video_clip_url: alert.video_clip_path 
-          ? `/api/videos/${alert.video_clip_path}` 
+        video_clip_url: alert.video_clip_path
+          ? `/api/videos/${alert.video_clip_path}`
           : null
       }
     });
-    
+
     res.status(201).json({
       success: true,
       data: alert
     });
-    
+
   } catch (error) {
     console.error('Error creating alert:', error);
     res.status(400).json({
