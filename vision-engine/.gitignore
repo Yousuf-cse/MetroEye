@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.pyc
+*.pyo
+
+# Virtual Environment
+venv/
+venv311/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Model files (large binary files)
+*.pt
+*.pth
+*.onnx
+*.weights
+
+Data files
+# *.csv
+# *.json
+# rag_database.json
+# features_dump.csv
+
+# # Video files
+# *.mp4
+# *.avi
+# *.mov
+# *.webm
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Ignore all Markdown files in the entire project
+*.md
+
+# Ignore a specific folder named "md" at the root
+/md/
+
+# Ignore any folder named "md" anywhere in the project
+**/md/
