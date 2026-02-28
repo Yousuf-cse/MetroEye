@@ -11,7 +11,9 @@ const VideoStream = ({ cameraId }) => {
 
   useEffect(() => {
     // Connect to WebSocket
-    const socket = io(process.env.REACT_APP_WS_URL);
+    const wsUrl = process.env.REACT_APP_WS_URL || 'http://localhost:8000';
+    console.log('Connecting to WebSocket:', wsUrl);
+    const socket = io(wsUrl);
     socketRef.current = socket;
 
     socket.on('connect', () => {
@@ -116,7 +118,10 @@ const VideoStream = ({ cameraId }) => {
     });
   };
 
-  const streamUrl = `${process.env.REACT_APP_API_URL}/api/stream/${cameraId}/stream`;
+  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+  const streamUrl = `${apiUrl}/api/stream/${cameraId}/stream`;
+
+  console.log('Stream URL:', streamUrl);
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
