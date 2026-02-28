@@ -7,9 +7,10 @@ const socketIO = require('socket.io');
 require('dotenv').config();
 
 const alertRoutes = require('./routes/alertRoutes');
-const streamingRoutes = require('./routes/streamingRoutes'); 
+const streamingRoutes = require('./routes/streamingRoutes');
 const trackingRoutes = require('./routes/trackingRoutes');
-//test route 
+const calibrationRoutes = require('./routes/calibrationRoutes');
+//test route
 const testRoutes = require('./routes/testRoutes');
 
 
@@ -59,6 +60,7 @@ app.get('/', (req, res) => {
 app.use('/api/alerts', alertRoutes);
 app.use('/api/stream', streamingRoutes);
 app.use('/api/tracking', trackingRoutes);
+app.use('/api/calibration', calibrationRoutes);
 //test routes
 app.use('/api/test', testRoutes);
 
