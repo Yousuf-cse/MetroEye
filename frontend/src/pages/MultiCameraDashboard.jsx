@@ -1,23 +1,18 @@
 /**
  * Multi-Camera Dashboard - Monitor multiple cameras simultaneously
  *
- * Perfect for demo to judges - shows real-time tracking across multiple cameras
- *
  * Features:
  * - Grid layout with multiple camera feeds
  * - Real-time tracking data for each camera
  * - Responsive design (adapts to screen size)
  * - Connection status for all cameras
  * - Quick stats summary
+ * - Red laser scan animation background
  */
-
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import LiveFeed from '../components/LiveFeed';
-
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
-
-// --- Inline styles as constants for the brutalist safety-monitor theme ---
 const palette = {
   bg: '#101014',
   surface: '#18181c',
@@ -33,12 +28,10 @@ const palette = {
   safeGlow: 'rgba(52,211,153,0.3)',
   warn: '#fbbf24',
 };
-
 const font = {
   mono: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
   display: "'Inter', 'Helvetica Neue', Arial, sans-serif",
 };
-
 const keyframesStyle = `
 @keyframes dash-pulse {
   0%, 100% { opacity: 1; }
@@ -60,24 +53,37 @@ const keyframesStyle = `
   0%, 100% { border-color: #2a2a32; }
   50% { border-color: #e04040; }
 }
+@keyframes laser-sweep {
+  0% { top: -2px; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+@keyframes laser-horizontal {
+  0% { left: -20%; opacity: 0; }
+  10% { opacity: 0.6; }
+  50% { opacity: 0.3; }
+  90% { opacity: 0.6; }
+  100% { left: 120%; opacity: 0; }
+}
+@keyframes laser-pulse {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.35; }
+}
 `;
-
 export default function MultiCameraDashboard() {
   const [cameras, setCameras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid');
   const [focusedCamera, setFocusedCamera] = useState(null);
-
   const defaultCameras = [
     { id: 'camera_1', name: 'Platform 1 — North', location: 'Gate A' },
     { id: 'camera_2', name: 'Platform 2 — South', location: 'Gate B' },
     { id: 'camera_3', name: 'Platform 3 — Central', location: 'Main Hall' },
   ];
-
   useEffect(() => {
     loadCameras();
   }, []);
-
   const loadCameras = async () => {
     try {
       const response = await axios.get(`${BACKEND_URL}/api/cameras`);
@@ -89,7 +95,6 @@ export default function MultiCameraDashboard() {
       setLoading(false);
     }
   };
-
   const getGridClass = () => {
     const count = cameras.length;
     if (count === 1) return 'grid-cols-1';
@@ -97,259 +102,340 @@ export default function MultiCameraDashboard() {
     if (count === 3) return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
     return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4';
   };
-
   if (loading) {
     return (
       <>
         <style>{keyframesStyle}</style>
         <div
-          className="min-h-screen flex items-center justify-center"
-          style={{ background: palette.bg, fontFamily: font.display }}
+          style={{
+            minHeight: '100vh',
+            background: palette.bg,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
-          <div className="text-center" style={{ animation: 'slide-up 0.6s ease-out' }}>
-            {/* Spinner — square brutalist */}
+          <div style={{ textAlign: 'center' }}>
             <div
               style={{
-                width: 56,
-                height: 56,
+                width: 48,
+                height: 48,
+                border: `2px solid ${palette.border}`,
+                borderTop: `2px solid ${palette.accent}`,
                 margin: '0 auto 24px',
-                border: `3px solid ${palette.border}`,
-                borderTop: `3px solid ${palette.accent}`,
-                animation: 'spin 0.8s linear infinite',
+                animation: 'dash-pulse 1.2s linear infinite',
+                borderRadius: 0,
               }}
             />
-            <p
+            <div
               style={{
                 fontFamily: font.mono,
-                fontSize: '0.85rem',
-                letterSpacing: '0.25em',
+                fontSize: '0.8rem',
                 color: palette.text,
+                letterSpacing: '0.15em',
                 textTransform: 'uppercase',
               }}
             >
               Initializing Feeds
-            </p>
-            <p
+            </div>
+            <div
               style={{
                 fontFamily: font.mono,
-                fontSize: '0.6rem',
+                fontSize: '0.65rem',
                 color: palette.textMuted,
-                letterSpacing: '0.3em',
                 marginTop: 8,
+                letterSpacing: '0.1em',
               }}
             >
               Establishing Secure Connection
-            </p>
+            </div>
           </div>
         </div>
       </>
     );
   }
-
   return (
     <>
       <style>{keyframesStyle}</style>
       <div
-        className="min-h-screen flex flex-col"
-        style={{ background: palette.bg, fontFamily: font.display, color: palette.text }}
+        style={{
+          minHeight: '100vh',
+          background: palette.bg,
+          color: palette.text,
+          fontFamily: font.display,
+          position: 'relative',
+          overflow: 'hidden',
+        }}
       >
+        {/* ─── RED LASER BACKGROUND EFFECTS ─── */}
+        {/* Vertical laser sweep */}
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: -1,
+            pointerEvents: 'none',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              height: 2,
+              background: `linear-gradient(90deg, transparent 0%, ${palette.accent} 20%, ${palette.accent} 80%, transparent 100%)`,
+              boxShadow: `0 0 20px 4px ${palette.accentGlow}, 0 0 60px 10px rgba(224,64,64,0.1)`,
+              animation: 'laser-sweep 6s ease-in-out infinite',
+              opacity: 0.6,
+            }}
+          />
+          {/* Horizontal laser sweep */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '30%',
+              width: 2,
+              height: '40%',
+              background: `linear-gradient(180deg, transparent 0%, ${palette.accent} 30%, ${palette.accent} 70%, transparent 100%)`,
+              boxShadow: `0 0 15px 3px ${palette.accentGlow}, 0 0 40px 8px rgba(224,64,64,0.08)`,
+              animation: 'laser-horizontal 8s ease-in-out infinite',
+              opacity: 0.4,
+            }}
+          />
+          {/* Pulsing grid lines */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `
+                linear-gradient(rgba(224,64,64,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(224,64,64,0.03) 1px, transparent 1px)
+              `,
+              backgroundSize: '60px 60px',
+              animation: 'laser-pulse 4s ease-in-out infinite',
+            }}
+          />
+          {/* Corner accent glows */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: 200,
+              height: 200,
+              background: `radial-gradient(circle at top left, rgba(224,64,64,0.06) 0%, transparent 70%)`,
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              right: 0,
+              width: 200,
+              height: 200,
+              background: `radial-gradient(circle at bottom right, rgba(224,64,64,0.06) 0%, transparent 70%)`,
+            }}
+          />
+        </div>
         {/* Subtle scanline overlay */}
         <div
           style={{
-            pointerEvents: 'none',
             position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background:
-              'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,255,255,0.008) 3px, rgba(255,255,255,0.008) 4px)',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 2,
+            background: `linear-gradient(90deg, transparent, ${palette.accent}, transparent)`,
+            opacity: 0.3,
+            animation: 'scanline 4s linear infinite',
+            zIndex: 50,
+            pointerEvents: 'none',
           }}
         />
-
         {/* ─── HEADER ─── */}
         <header
           style={{
-            background: palette.surface,
             borderBottom: `1px solid ${palette.border}`,
+            background: `${palette.bg}ee`,
+            backdropFilter: 'blur(12px)',
             position: 'sticky',
             top: 0,
-            zIndex: 50,
+            zIndex: 40,
           }}
         >
-          <div className="max-w-screen-2xl mx-auto px-6 py-4">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              {/* Logo & Title */}
-              <div className="flex items-center gap-4">
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    border: `2px solid ${palette.accent}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontFamily: font.display,
-                    fontSize: '1.1rem',
-                    fontWeight: 800,
-                    color: palette.accent,
-                    letterSpacing: '-0.02em',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  M
-                  {/* top accent line */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      height: 3,
-                      background: palette.accent,
-                    }}
-                  />
-                </div>
-                <div>
-                  <h1
-                    style={{
-                      fontFamily: font.display,
-                      fontSize: '1.25rem',
-                      fontWeight: 700,
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase',
-                      color: palette.text,
-                      margin: 0,
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    Metro<span style={{ color: palette.accent }}>Eye</span>
-                  </h1>
-                  <p
-                    style={{
-                      fontFamily: font.mono,
-                      color: palette.textMuted,
-                      fontSize: '0.6rem',
-                      letterSpacing: '0.2em',
-                      textTransform: 'uppercase',
-                      margin: 0,
-                    }}
-                  >
-                    AI Platform Safety · Detection & Prevention
-                  </p>
-                </div>
-              </div>
-
-              {/* View Mode Toggle */}
+          <div
+            style={{
+              maxWidth: 1600,
+              margin: '0 auto',
+              padding: '16px 24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 16,
+            }}
+          >
+            {/* Logo & Title */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <div
-                className="flex items-center"
-                style={{ border: `1px solid ${palette.border}`, overflow: 'hidden' }}
-              >
-                {['grid', 'list'].map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => setViewMode(mode)}
-                    style={{
-                      padding: '8px 18px',
-                      fontSize: '0.7rem',
-                      fontFamily: font.mono,
-                      letterSpacing: '0.12em',
-                      border: 'none',
-                      cursor: 'pointer',
-                      textTransform: 'uppercase',
-                      transition: 'all 0.15s ease',
-                      background: viewMode === mode ? palette.accent : 'transparent',
-                      color: viewMode === mode ? '#fff' : palette.textMuted,
-                    }}
-                  >
-                    {mode === 'grid' ? '▦' : '☰'} {mode}
-                  </button>
-                ))}
-              </div>
-
-              {/* Stats */}
-              <div
-                className="hidden lg:flex items-center gap-5"
                 style={{
-                  border: `1px solid ${palette.border}`,
-                  padding: '10px 20px',
-                  background: palette.accentSoft,
+                  width: 40,
+                  height: 40,
+                  border: `2px solid ${palette.accent}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontFamily: font.mono,
+                  fontWeight: 700,
+                  fontSize: '1.1rem',
+                  color: palette.accent,
+                  position: 'relative',
+                  borderRadius: 0,
                 }}
               >
-                <div className="text-center">
-                  <div
-                    style={{
-                      fontSize: '1.4rem',
-                      fontWeight: 700,
-                      color: palette.text,
-                      fontFamily: font.mono,
-                    }}
-                  >
-                    {cameras.length}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '0.55rem',
-                      color: palette.textMuted,
-                      letterSpacing: '0.25em',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    Cameras
-                  </div>
+                M
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: -1,
+                    left: 8,
+                    right: 8,
+                    height: 2,
+                    background: palette.accent,
+                  }}
+                />
+              </div>
+              <div>
+                <div
+                  style={{
+                    fontFamily: font.display,
+                    fontWeight: 700,
+                    fontSize: '1.1rem',
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  MetroEye
                 </div>
-                <div style={{ width: 1, height: 28, background: palette.border }} />
-                <div className="text-center flex items-center gap-2">
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      background: palette.safe,
-                      borderRadius: '50%',
-                      animation: 'status-blink 2s ease-in-out infinite',
-                    }}
-                  />
-                  <div
-                    style={{
-                      fontSize: '0.65rem',
-                      color: palette.safe,
-                      letterSpacing: '0.15em',
-                      fontFamily: font.mono,
-                    }}
-                  >
-                    ALL ACTIVE
-                  </div>
+                <div
+                  style={{
+                    fontFamily: font.mono,
+                    fontSize: '0.6rem',
+                    color: palette.textMuted,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  AI Platform Safety · Detection & Prevention
                 </div>
+              </div>
+            </div>
+            {/* View Mode Toggle */}
+            <div style={{ display: 'flex', gap: 0, border: `1px solid ${palette.border}`, borderRadius: 0 }}>
+              {['grid', 'list'].map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  style={{
+                    padding: '8px 18px',
+                    fontSize: '0.7rem',
+                    fontFamily: font.mono,
+                    letterSpacing: '0.12em',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    transition: 'all 0.15s ease',
+                    background: viewMode === mode ? palette.accent : 'transparent',
+                    color: viewMode === mode ? '#fff' : palette.textMuted,
+                    borderRadius: 0,
+                  }}
+                >
+                  {mode === 'grid' ? '▦' : '☰'} {mode}
+                </button>
+              ))}
+            </div>
+            {/* Stats */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+              <div style={{ textAlign: 'center' }}>
+                <div
+                  style={{
+                    fontFamily: font.mono,
+                    fontSize: '1.4rem',
+                    fontWeight: 700,
+                    color: palette.accent,
+                  }}
+                >
+                  {cameras.length}
+                </div>
+                <div
+                  style={{
+                    fontFamily: font.mono,
+                    fontSize: '0.55rem',
+                    color: palette.textMuted,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.15em',
+                  }}
+                >
+                  Cameras
+                </div>
+              </div>
+              <div style={{ width: 1, height: 28, background: palette.border }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    background: palette.safe,
+                    animation: 'status-blink 2s infinite',
+                    borderRadius: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: font.mono,
+                    fontSize: '0.65rem',
+                    color: palette.safe,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  ALL ACTIVE
+                </span>
               </div>
             </div>
           </div>
         </header>
-
         {/* ─── MAIN ─── */}
-        <main className="max-w-screen-2xl mx-auto px-6 py-6 relative z-10 flex-1 w-full">
+        <main style={{ maxWidth: 1600, margin: '0 auto', padding: '0 24px 40px' }}>
           {/* Status Bar */}
           <div
-            className="mb-5 flex items-center justify-between flex-wrap gap-3"
             style={{
-              border: `1px solid ${palette.border}`,
-              borderLeft: `3px solid ${palette.accent}`,
-              background: palette.surface,
-              padding: '14px 20px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '14px 0',
+              borderBottom: `1px solid ${palette.border}`,
+              marginBottom: 24,
+              flexWrap: 'wrap',
+              gap: 12,
             }}
           >
-            <div
+            <span
               style={{
-                fontSize: '0.72rem',
-                color: palette.textMuted,
-                letterSpacing: '0.1em',
                 fontFamily: font.mono,
+                fontSize: '0.7rem',
+                color: palette.textMuted,
+                letterSpacing: '0.08em',
               }}
             >
               Monitoring{' '}
-              <span style={{ color: palette.text, fontWeight: 600 }}>{cameras.length}</span>{' '}
+              <span style={{ color: palette.text }}>{cameras.length}</span>{' '}
               camera{cameras.length !== 1 ? 's' : ''} · AI Detection Active
-            </div>
-
-            <div className="flex items-center gap-2">
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
               {[
                 { href: '/calibration', label: '◎ Calibration', color: palette.text, borderColor: palette.border },
                 { href: '/alerts', label: '▲ Alerts', color: palette.accent, borderColor: 'rgba(224,64,64,0.3)' },
@@ -358,16 +444,16 @@ export default function MultiCameraDashboard() {
                   key={link.href}
                   href={link.href}
                   style={{
+                    fontFamily: font.mono,
+                    fontSize: '0.65rem',
+                    color: link.color,
+                    textDecoration: 'none',
                     padding: '6px 14px',
                     border: `1px solid ${link.borderColor}`,
-                    background: 'transparent',
-                    color: link.color,
-                    fontSize: '0.65rem',
-                    letterSpacing: '0.12em',
-                    textDecoration: 'none',
-                    fontFamily: font.mono,
+                    letterSpacing: '0.1em',
                     textTransform: 'uppercase',
                     transition: 'all 0.15s ease',
+                    borderRadius: 0,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = `${link.color}12`;
@@ -383,21 +469,31 @@ export default function MultiCameraDashboard() {
               ))}
             </div>
           </div>
-
           {/* ─── GRID VIEW ─── */}
           {viewMode === 'grid' && (
-            <div className={`grid ${getGridClass()} gap-4`}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: cameras.length === 1
+                  ? '1fr'
+                  : cameras.length === 2
+                  ? 'repeat(2, 1fr)'
+                  : 'repeat(3, 1fr)',
+                gap: 20,
+              }}
+            >
               {cameras.map((camera, i) => (
                 <div
                   key={camera.id}
-                  className="cursor-pointer group"
                   style={{
-                    border: `1px solid ${palette.border}`,
                     background: palette.surface,
+                    border: `1px solid ${palette.border}`,
+                    cursor: 'pointer',
                     transition: 'all 0.2s ease',
+                    animation: `slide-up 0.4s ease ${i * 0.1}s both`,
                     position: 'relative',
                     overflow: 'hidden',
-                    animation: `slide-up 0.4s ease-out ${i * 0.08}s both`,
+                    borderRadius: 0,
                   }}
                   onClick={() => {
                     setFocusedCamera(camera.id);
@@ -415,38 +511,27 @@ export default function MultiCameraDashboard() {
                   }}
                 >
                   {/* Top accent bar */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      height: 2,
-                      background: `linear-gradient(90deg, ${palette.accent}, transparent)`,
-                    }}
-                  />
-
+                  <div style={{ height: 2, background: palette.accent, opacity: 0.6 }} />
                   {/* Camera header */}
                   <div
                     style={{
-                      padding: '10px 14px',
-                      borderBottom: `1px solid ${palette.border}`,
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      background: 'rgba(0,0,0,0.25)',
+                      padding: '12px 16px',
+                      borderBottom: `1px solid ${palette.border}`,
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: '0.85rem', opacity: 0.5 }}>📹</span>
+                      <span style={{ fontSize: '0.85rem' }}>📹</span>
                       <span
                         style={{
-                          fontFamily: font.display,
-                          fontSize: '0.82rem',
-                          fontWeight: 700,
+                          fontFamily: font.mono,
+                          fontSize: '0.7rem',
                           color: palette.text,
-                          letterSpacing: '0.06em',
+                          letterSpacing: '0.1em',
                           textTransform: 'uppercase',
+                          fontWeight: 600,
                         }}
                       >
                         Camera {i + 1}
@@ -455,11 +540,11 @@ export default function MultiCameraDashboard() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div
                         style={{
-                          width: 7,
-                          height: 7,
+                          width: 6,
+                          height: 6,
                           background: palette.safe,
-                          borderRadius: '50%',
-                          animation: 'status-blink 2s ease-in-out infinite',
+                          animation: 'status-blink 2s infinite',
+                          borderRadius: 0,
                         }}
                       />
                       <span
@@ -468,22 +553,24 @@ export default function MultiCameraDashboard() {
                           fontSize: '0.6rem',
                           color: palette.safe,
                           letterSpacing: '0.1em',
+                          textTransform: 'uppercase',
+                          background: 'transparent',
+                          padding: 0,
+                          borderRadius: 0,
                         }}
                       >
                         Live
                       </span>
                     </div>
                   </div>
-
                   {/* Feed */}
-                  <LiveFeed cameraId={camera.id} showStats={true} />
-
-                  {/* Camera info footer */}
+                  <LiveFeed cameraId={camera.id} />
+                  {/* Camera info footer — matched to dashboard aesthetic */}
                   <div
                     style={{
-                      padding: '10px 14px',
+                      padding: '12px 16px',
                       borderTop: `1px solid ${palette.border}`,
-                      background: 'rgba(0,0,0,0.2)',
+                      background: palette.bg,
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
@@ -492,11 +579,11 @@ export default function MultiCameraDashboard() {
                     <div>
                       <div
                         style={{
-                          fontFamily: font.display,
-                          fontSize: '0.78rem',
-                          fontWeight: 600,
+                          fontFamily: font.mono,
+                          fontSize: '0.68rem',
                           color: palette.text,
-                          letterSpacing: '0.02em',
+                          letterSpacing: '0.06em',
+                          fontWeight: 600,
                         }}
                       >
                         {camera.name}
@@ -504,11 +591,11 @@ export default function MultiCameraDashboard() {
                       <div
                         style={{
                           fontFamily: font.mono,
-                          fontSize: '0.55rem',
+                          fontSize: '0.58rem',
                           color: palette.textMuted,
-                          letterSpacing: '0.18em',
-                          textTransform: 'uppercase',
+                          letterSpacing: '0.08em',
                           marginTop: 2,
+                          textTransform: 'uppercase',
                         }}
                       >
                         {camera.location}
@@ -516,93 +603,123 @@ export default function MultiCameraDashboard() {
                     </div>
                     <div
                       style={{
-                        padding: '3px 8px',
-                        border: `1px solid ${palette.border}`,
-                        fontFamily: font.mono,
-                        fontSize: '0.52rem',
-                        color: palette.textMuted,
-                        letterSpacing: '0.1em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
                       }}
                     >
-                      {camera.id.replace('_', ':')}
+                      <div
+                        style={{
+                          width: 4,
+                          height: 4,
+                          background: palette.accent,
+                          borderRadius: 0,
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontFamily: font.mono,
+                          fontSize: '0.55rem',
+                          color: palette.textMuted,
+                          letterSpacing: '0.1em',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        Tracking
+                      </span>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
-
           {/* ─── LIST VIEW ─── */}
           {viewMode === 'list' && (
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {cameras.map((camera, i) => (
                 <div
                   key={camera.id}
                   style={{
-                    border: `1px solid ${palette.border}`,
-                    borderLeft: `3px solid ${palette.accent}`,
-                    background: palette.surface,
-                    padding: '20px 24px',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    animation: `slide-up 0.4s ease-out ${i * 0.06}s both`,
+                    animation: `slide-up 0.3s ease ${i * 0.08}s both`,
                   }}
                 >
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <LiveFeed cameraId={camera.id} showStats={false} />
+                  <div
+                    style={{
+                      background: palette.surface,
+                      border: `1px solid ${palette.border}`,
+                      padding: 20,
+                      display: 'flex',
+                      gap: 24,
+                      alignItems: 'flex-start',
+                      transition: 'all 0.2s ease',
+                      borderRadius: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 320,
+                        flexShrink: 0,
+                        border: `1px solid ${palette.border}`,
+                        overflow: 'hidden',
+                        borderRadius: 0,
+                      }}
+                    >
+                      <LiveFeed cameraId={camera.id} />
                     </div>
-                    <div className="flex flex-col justify-between">
+                    <div style={{ flex: 1 }}>
                       <div>
-                        <h3
+                        <div
                           style={{
                             fontFamily: font.display,
-                            fontSize: '1.15rem',
                             fontWeight: 700,
-                            color: palette.text,
-                            letterSpacing: '0.03em',
-                            margin: '0 0 6px 0',
+                            fontSize: '1rem',
+                            marginBottom: 4,
                           }}
                         >
                           {camera.name}
-                        </h3>
-                        <p
+                        </div>
+                        <div
                           style={{
                             fontFamily: font.mono,
-                            color: palette.textMuted,
                             fontSize: '0.65rem',
-                            letterSpacing: '0.15em',
+                            color: palette.textMuted,
+                            letterSpacing: '0.1em',
                             textTransform: 'uppercase',
-                            marginBottom: 16,
                           }}
                         >
                           {camera.location}
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: 24,
+                            marginTop: 14,
+                            flexWrap: 'wrap',
+                          }}
+                        >
                           {[
                             { label: 'Status', value: '● Active', color: palette.safe },
                             { label: 'Cam ID', value: camera.id, color: palette.text },
                           ].map((row) => (
-                            <div
-                              key={row.label}
-                              className="flex justify-between"
-                              style={{
-                                fontSize: '0.7rem',
-                                borderBottom: `1px solid ${palette.border}`,
-                                paddingBottom: 6,
-                              }}
-                            >
+                            <div key={row.label} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                               <span
                                 style={{
-                                  color: palette.textMuted,
-                                  letterSpacing: '0.15em',
-                                  textTransform: 'uppercase',
                                   fontFamily: font.mono,
+                                  fontSize: '0.6rem',
+                                  color: palette.textMuted,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.1em',
                                 }}
                               >
                                 {row.label}
                               </span>
-                              <span style={{ color: row.color, fontFamily: font.mono }}>
+                              <span
+                                style={{
+                                  fontFamily: font.mono,
+                                  fontSize: '0.65rem',
+                                  color: row.color,
+                                }}
+                              >
                                 {row.value}
                               </span>
                             </div>
@@ -626,6 +743,7 @@ export default function MultiCameraDashboard() {
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
                           textTransform: 'uppercase',
+                          borderRadius: 0,
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = palette.accent;
@@ -644,50 +762,63 @@ export default function MultiCameraDashboard() {
               ))}
             </div>
           )}
-
           {/* ─── FOCUS VIEW ─── */}
           {viewMode === 'focus' && focusedCamera && (
-            <div
-              className="fixed inset-0 z-50 flex items-center justify-center p-6"
-              style={{ background: 'rgba(10,10,14,0.97)', animation: 'slide-up 0.3s ease-out' }}
-            >
-              {/* Scanline */}
+            <div style={{ animation: 'slide-up 0.3s ease both' }}>
+              {/* Scanline on focused view */}
               <div
                 style={{
-                  pointerEvents: 'none',
                   position: 'absolute',
-                  inset: 0,
-                  background:
-                    'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,255,255,0.008) 3px, rgba(255,255,255,0.008) 4px)',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 1,
+                  background: `linear-gradient(90deg, transparent, ${palette.accent}, transparent)`,
+                  animation: 'scanline 3s linear infinite',
+                  opacity: 0.5,
+                  zIndex: 2,
+                  pointerEvents: 'none',
                 }}
               />
-              <div className="w-full max-w-7xl relative z-10">
-                <div className="mb-4 flex justify-between items-center">
+              <div
+                style={{
+                  background: palette.surface,
+                  border: `1px solid ${palette.border}`,
+                  overflow: 'hidden',
+                  borderRadius: 0,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '16px 20px',
+                    borderBottom: `1px solid ${palette.border}`,
+                  }}
+                >
                   <div>
-                    <h2
+                    <div
                       style={{
                         fontFamily: font.display,
-                        fontSize: '1.4rem',
                         fontWeight: 700,
-                        color: palette.text,
-                        letterSpacing: '0.04em',
-                        margin: 0,
+                        fontSize: '1.1rem',
                       }}
                     >
                       {cameras.find((c) => c.id === focusedCamera)?.name}
-                    </h2>
-                    <p
+                    </div>
+                    <div
                       style={{
                         fontFamily: font.mono,
                         fontSize: '0.6rem',
                         color: palette.textMuted,
-                        letterSpacing: '0.2em',
+                        letterSpacing: '0.1em',
                         textTransform: 'uppercase',
                         marginTop: 4,
                       }}
                     >
                       Live Feed · AI Monitoring Active
-                    </p>
+                    </div>
                   </div>
                   <button
                     onClick={() => setViewMode('grid')}
@@ -702,6 +833,7 @@ export default function MultiCameraDashboard() {
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
                       textTransform: 'uppercase',
+                      borderRadius: 0,
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.borderColor = palette.accent;
@@ -715,69 +847,65 @@ export default function MultiCameraDashboard() {
                     ✕ Close
                   </button>
                 </div>
-                <div
-                  style={{
-                    border: `1px solid ${palette.border}`,
-                    boxShadow: `0 0 40px ${palette.accentGlow}`,
-                  }}
-                >
-                  <LiveFeed cameraId={focusedCamera} showStats={true} className="shadow-2xl" />
+                <div style={{ padding: 20 }}>
+                  <LiveFeed cameraId={focusedCamera} />
                 </div>
               </div>
             </div>
           )}
-
           {/* ─── EMPTY STATE ─── */}
           {cameras.length === 0 && (
             <div
-              className="text-center py-20"
-              style={{ animation: 'slide-up 0.5s ease-out' }}
+              style={{
+                textAlign: 'center',
+                padding: '80px 20px',
+                border: `1px dashed ${palette.border}`,
+                borderRadius: 0,
+              }}
             >
               <div
                 style={{
                   fontSize: '2.5rem',
-                  color: palette.textMuted,
-                  marginBottom: 12,
+                  marginBottom: 16,
+                  opacity: 0.3,
                 }}
               >
                 ◻
               </div>
-              <h3
+              <div
                 style={{
                   fontFamily: font.display,
-                  fontSize: '1.2rem',
-                  fontWeight: 700,
-                  color: palette.text,
-                  letterSpacing: '0.06em',
+                  fontWeight: 600,
+                  fontSize: '1rem',
                   marginBottom: 8,
-                  textTransform: 'uppercase',
                 }}
               >
                 No Cameras Detected
-              </h3>
-              <p
+              </div>
+              <div
                 style={{
                   fontFamily: font.mono,
+                  fontSize: '0.7rem',
                   color: palette.textMuted,
-                  fontSize: '0.68rem',
-                  letterSpacing: '0.15em',
+                  letterSpacing: '0.08em',
                   marginBottom: 24,
                 }}
               >
                 Connect surveillance feeds to begin monitoring
-              </p>
+              </div>
               <button
                 style={{
-                  padding: '12px 24px',
+                  padding: '12px 28px',
                   border: `1px solid ${palette.accent}`,
                   background: 'transparent',
                   color: palette.accent,
                   fontFamily: font.mono,
-                  fontSize: '0.72rem',
-                  letterSpacing: '0.15em',
+                  fontSize: '0.7rem',
+                  letterSpacing: '0.12em',
                   cursor: 'pointer',
                   textTransform: 'uppercase',
                   transition: 'all 0.15s ease',
+                  borderRadius: 0,
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = palette.accent;
@@ -793,42 +921,55 @@ export default function MultiCameraDashboard() {
             </div>
           )}
         </main>
-
         {/* ─── FOOTER ─── */}
         <footer
           style={{
             borderTop: `1px solid ${palette.border}`,
-            background: palette.surface,
-            marginTop: 'auto',
+            padding: '16px 24px',
+            background: `${palette.bg}ee`,
           }}
         >
-          <div className="max-w-screen-2xl mx-auto px-6 py-4">
+          <div
+            style={{
+              maxWidth: 1600,
+              margin: '0 auto',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
             <div
-              className="flex items-center justify-between flex-wrap gap-2"
               style={{
-                fontSize: '0.58rem',
-                color: palette.textMuted,
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase',
                 fontFamily: font.mono,
+                fontSize: '0.6rem',
+                color: palette.textMuted,
+                letterSpacing: '0.08em',
               }}
             >
-              <div>
-                Metro<span style={{ color: palette.accent, fontWeight: 600 }}>Eye</span> · AI-Powered
-                Platform Safety & Prevention
-              </div>
-              <div className="flex items-center gap-2">
-                <div
-                  style={{
-                    width: 6,
-                    height: 6,
-                    background: palette.safe,
-                    borderRadius: '50%',
-                    animation: 'status-blink 2s ease-in-out infinite',
-                  }}
-                />
+              MetroEye · AI-Powered
+              <span style={{ margin: '0 8px', opacity: 0.3 }}>|</span>
+              Platform Safety & Prevention
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div
+                style={{
+                  width: 6,
+                  height: 6,
+                  background: palette.safe,
+                  borderRadius: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontFamily: font.mono,
+                  fontSize: '0.6rem',
+                  color: palette.safe,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                }}
+              >
                 System Operational
-              </div>
+              </span>
             </div>
           </div>
         </footer>
