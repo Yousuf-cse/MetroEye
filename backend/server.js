@@ -7,6 +7,12 @@ const socketIO = require('socket.io');
 require('dotenv').config();
 
 const alertRoutes = require('./routes/alertRoutes');
+const streamingRoutes = require('./routes/streamingRoutes'); 
+const trackingRoutes = require('./routes/trackingRoutes');
+//test route 
+const testRoutes = require('./routes/testRoutes');
+
+
 
 // Initialize Express
 const app = express();
@@ -51,16 +57,25 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/alerts', alertRoutes);
+app.use('/api/stream', streamingRoutes);
+app.use('/api/tracking', trackingRoutes);
+//test routes
+app.use('/api/test', testRoutes);
 
 // Serve video files
-app.use('/api/videos', express.static(path.join(__dirname, 'public/clips')));
+app.use('/api/videos', express.static(path.join(__dirname, '../shared/alert-videos')));
 
 // WebSocket connection handling
 io.on('connection', (socket) => {
-  console.log('✅ WebSocket client connected:', socket.id);
+  console.log('✅ Client connected:', socket.id);
+  
+  socket.on('subscribe_tracking', (cameraId) => {
+    socket.join(`tracking_${cameraId}`);
+    console.log(`📹 Client subscribed to tracking: ${cameraId}`);
+  });
   
   socket.on('disconnect', () => {
-    console.log('❌ WebSocket client disconnected:', socket.id);
+    console.log('❌ Client disconnected:', socket.id);
   });
 });
 
