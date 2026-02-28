@@ -1,0 +1,93 @@
+# MetroEye Vision Engine - Computer Vision Requirements
+# Install with: pip install -r requirements.txt
+
+# ============================================
+# CORE COMPUTER VISION PACKAGES
+# ============================================
+
+# YOLO and Ultralytics
+ultralytics>=8.0.0              # YOLO models (detection, segmentation, pose)
+
+# OpenCV - Computer Vision
+opencv-python>=4.8.0            # Core OpenCV library
+opencv-contrib-python>=4.8.0    # Additional OpenCV modules (SIFT, SURF, etc.)
+
+# Deep Learning Framework
+torch>=2.0.0                    # PyTorch for neural networks
+torchvision>=0.15.0             # PyTorch vision utilities
+
+# Numerical Computing
+numpy>=1.24.0                   # Array operations and numerical computing
+scipy>=1.10.0                   # Scientific computing algorithms
+
+# ============================================
+# IMAGE & VIDEO PROCESSING
+# ============================================
+
+Pillow>=10.0.0                  # Image processing and manipulation
+imageio>=2.31.0                 # Reading and writing image data
+scikit-image>=0.21.0            # Image processing algorithms
+
+# ============================================
+# MACHINE LEARNING & DATA SCIENCE
+# ============================================
+
+scikit-learn>=1.3.0             # ML algorithms (classification, clustering)
+pandas>=2.0.0                   # Data manipulation and analysis
+
+# ============================================
+# VISUALIZATION & DEBUGGING
+# ============================================
+
+matplotlib>=3.7.0               # Plotting and visualization
+seaborn>=0.12.0                 # Statistical data visualization
+plotly>=5.14.0                  # Interactive visualizations
+
+# ============================================
+# DATABASE & API
+# ============================================
+
+pymongo>=4.5.0                  # MongoDB driver for alert storage
+motor>=3.3.0                    # Async MongoDB driver
+requests>=2.31.0                # HTTP library for API calls
+aiohttp>=3.8.0                  # Async HTTP client/server
+
+# ============================================
+# UTILITIES & HELPERS
+# ============================================
+
+python-dotenv>=1.0.0            # Environment variable management
+pyyaml>=6.0                     # YAML parser for config files
+tqdm>=4.65.0                    # Progress bars
+rich>=13.5.0                    # Beautiful terminal output
+colorama>=0.4.6                 # Cross-platform colored terminal text
+
+# ============================================
+# VIDEO PROCESSING
+# ============================================
+
+moviepy>=1.0.3                  # Video editing and processing
+av>=10.0.0                      # Python bindings for FFmpeg
+
+# ============================================
+# DATE & TIME
+# ============================================
+
+python-dateutil>=2.8.2          # Date and time utilities
+
+# ============================================
+# OPTIONAL: GPU ACCELERATION
+# ============================================
+
+# CUDA-enabled PyTorch (uncomment for GPU support)
+# Install with: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+
+# ============================================
+# OPTIONAL: ADDITIONAL FEATURES
+# ============================================
+
+# flask>=2.3.0                  # Web framework for API endpoints
+# fastapi>=0.100.0              # Modern API framework
+# uvicorn>=0.23.0               # ASGI server for FastAPI
+# websockets>=11.0              # WebSocket support for real-time alerts
+# redis>=4.6.0                  # Redis cache for performance
