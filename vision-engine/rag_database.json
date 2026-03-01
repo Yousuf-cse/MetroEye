@@ -1,0 +1,188 @@
+{
+  "stations": {
+    "rajiv_chowk": {
+      "name": "Rajiv Chowk Metro Station",
+      "lines": ["Blue Line", "Yellow Line"],
+      "platforms": {
+        "platform_1": {
+          "direction": "Dwarka Sector 21",
+          "line": "Blue Line",
+          "yellow_line_distance_px": 100,
+          "danger_zone_threshold_px": 150,
+          "cameras": ["cam_1", "cam_2"]
+        },
+        "platform_2": {
+          "direction": "Noida City Centre / Vaishali",
+          "line": "Blue Line",
+          "yellow_line_distance_px": 100,
+          "danger_zone_threshold_px": 150,
+          "cameras": ["cam_3", "cam_4"]
+        },
+        "platform_3": {
+          "direction": "HUDA City Centre",
+          "line": "Yellow Line",
+          "yellow_line_distance_px": 100,
+          "danger_zone_threshold_px": 150,
+          "cameras": ["cam_5", "cam_6"]
+        },
+        "platform_4": {
+          "direction": "Samaypur Badli",
+          "line": "Yellow Line",
+          "yellow_line_distance_px": 100,
+          "danger_zone_threshold_px": 150,
+          "cameras": ["cam_7", "cam_8"]
+        }
+      },
+      "schedule": {
+        "blue_line": {
+          "direction": "Dwarka Sector 21",
+          "frequency_minutes": 5,
+          "first_train": "05:00",
+          "last_train": "23:30",
+          "peak_hours": ["08:00-10:00", "17:00-20:00"],
+          "peak_frequency_minutes": 3
+        },
+        "yellow_line": {
+          "direction": "HUDA City Centre",
+          "frequency_minutes": 4,
+          "first_train": "05:15",
+          "last_train": "23:45",
+          "peak_hours": ["08:00-10:00", "17:00-20:00"],
+          "peak_frequency_minutes": 2
+        }
+      }
+    },
+    "kashmere_gate": {
+      "name": "Kashmere Gate Metro Station",
+      "lines": ["Red Line", "Yellow Line", "Violet Line"],
+      "platforms": {
+        "platform_1": {
+          "direction": "Rithala",
+          "line": "Red Line",
+          "yellow_line_distance_px": 100,
+          "danger_zone_threshold_px": 150,
+          "cameras": ["km_cam_1", "km_cam_2"]
+        },
+        "platform_2": {
+          "direction": "Shaheed Sthal",
+          "line": "Red Line",
+          "yellow_line_distance_px": 100,
+          "danger_zone_threshold_px": 150,
+          "cameras": ["km_cam_3", "km_cam_4"]
+        }
+      },
+      "schedule": {
+        "red_line": {
+          "direction": "Rithala",
+          "frequency_minutes": 6,
+          "first_train": "05:30",
+          "last_train": "23:00",
+          "peak_hours": ["08:00-10:00", "17:00-20:00"],
+          "peak_frequency_minutes": 4
+        }
+      }
+    },
+    "demo_station": {
+      "name": "Demo Platform (Sample Station)",
+      "lines": ["Demo Line"],
+      "platforms": {
+        "platform_1": {
+          "direction": "Test Direction",
+          "line": "Demo Line",
+          "yellow_line_distance_px": 100,
+          "danger_zone_threshold_px": 150,
+          "cameras": ["platform_cam_1", "platform_cam_2"]
+        }
+      },
+      "schedule": {
+        "demo_line": {
+          "direction": "Test Direction",
+          "frequency_minutes": 5,
+          "first_train": "05:00",
+          "last_train": "23:30",
+          "peak_hours": ["08:00-10:00", "17:00-20:00"],
+          "peak_frequency_minutes": 3
+        }
+      }
+    }
+  },
+  "cameras": {
+    "cam_1": {
+      "station": "rajiv_chowk",
+      "platform": "platform_1",
+      "location": "north_end",
+      "fov_meters": 15,
+      "pixel_to_meter_ratio": 20,
+      "resolution": "1920x1080",
+      "fps": 30
+    },
+    "cam_2": {
+      "station": "rajiv_chowk",
+      "platform": "platform_1",
+      "location": "south_end",
+      "fov_meters": 15,
+      "pixel_to_meter_ratio": 20,
+      "resolution": "1920x1080",
+      "fps": 30
+    },
+    "cam_3": {
+      "station": "rajiv_chowk",
+      "platform": "platform_2",
+      "location": "north_end",
+      "fov_meters": 15,
+      "pixel_to_meter_ratio": 20,
+      "resolution": "1920x1080",
+      "fps": 30
+    },
+    "cam_4": {
+      "station": "rajiv_chowk",
+      "platform": "platform_2",
+      "location": "south_end",
+      "fov_meters": 15,
+      "pixel_to_meter_ratio": 20,
+      "resolution": "1920x1080",
+      "fps": 30
+    },
+    "platform_cam_1": {
+      "station": "demo_station",
+      "platform": "platform_1",
+      "location": "center",
+      "fov_meters": 20,
+      "pixel_to_meter_ratio": 20,
+      "resolution": "1920x1080",
+      "fps": 30
+    },
+    "platform_cam_2": {
+      "station": "demo_station",
+      "platform": "platform_1",
+      "location": "east_end",
+      "fov_meters": 15,
+      "pixel_to_meter_ratio": 20,
+      "resolution": "1920x1080",
+      "fps": 30
+    }
+  },
+  "risk_thresholds": {
+    "yellow_line_proximity_px": 100,
+    "danger_zone_proximity_px": 50,
+    "dwell_time_warning_seconds": 5,
+    "dwell_time_critical_seconds": 10,
+    "train_skip_suspicious_count": 2,
+    "train_skip_critical_count": 3,
+    "time_before_train_critical_seconds": 30,
+    "phone_usage_head_pitch_threshold": 30,
+    "acceleration_threshold_rush": 300
+  },
+  "metadata": {
+    "version": "1.0",
+    "last_updated": "2026-02-23",
+    "description": "RAG database for metro suspicious behavior detection system. Contains station layouts, train schedules, camera mappings, and risk thresholds.",
+    "notes": [
+      "pixel_to_meter_ratio: How many pixels equal 1 meter (for distance calculations)",
+      "yellow_line_distance_px: Distance from platform edge to yellow safety line",
+      "danger_zone_threshold_px: Distance from edge considered dangerous",
+      "Train schedules are approximations for demo purposes",
+      "For production: integrate with real-time train API"
+    ]
+  }
+}

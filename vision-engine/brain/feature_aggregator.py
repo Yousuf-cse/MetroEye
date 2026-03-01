@@ -26,6 +26,13 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 import time
 
+# Import advanced feature extractor
+try:
+    from brain.advanced_features import AdvancedFeatureExtractor
+    ADVANCED_FEATURES_AVAILABLE = True
+except ImportError:
+    ADVANCED_FEATURES_AVAILABLE = False
+
 
 class FeatureAggregator:
     """
@@ -66,7 +73,13 @@ class FeatureAggregator:
         # Track when we first saw each person (for dwell time calculation)
         self.first_seen = {}
 
-        print(f"✓ FeatureAggregator initialized (window={window_seconds}s)")
+        # Initialize advanced feature extractor
+        if ADVANCED_FEATURES_AVAILABLE:
+            self.advanced_extractor = AdvancedFeatureExtractor()
+            print(f"✓ FeatureAggregator initialized (window={window_seconds}s, advanced features enabled)")
+        else:
+            self.advanced_extractor = None
+            print(f"✓ FeatureAggregator initialized (window={window_seconds}s)")
 
 
     def add_frame_features(self, track_id: int, timestamp: float, features: Dict):
@@ -81,6 +94,8 @@ class FeatureAggregator:
                 - 'speed': Movement speed (pixels/second)
                 - 'dist_to_edge': Distance to platform edge (pixels)
                 - 'center': (x, y) bbox center coordinates
+                - 'keypoints': YOLO pose keypoints array (17, 2) [OPTIONAL, for advanced features]
+                - 'bbox': Bounding box (x1, y1, x2, y2) [OPTIONAL, for isolation metric]
 
         LEARNING: This is called EVERY frame (30 times per second).
         We store all recent frames in a window, then aggregate them.
@@ -131,6 +146,8 @@ class FeatureAggregator:
         centers = []
         timestamps = []  # NEW: for acceleration computation
         head_pitches = []  # NEW: for phone detection
+        keypoints_list = []  # NEW: for advanced features
+        bboxes = []  # NEW: for isolation metric
 
         for ts, feat in window:
             timestamps.append(ts)  # Track timestamps for acceleration
@@ -146,6 +163,10 @@ class FeatureAggregator:
                 centers.append(feat['center'])
             if feat.get('head_pitch') is not None:  # NEW
                 head_pitches.append(feat['head_pitch'])
+            if feat.get('keypoints') is not None:  # NEW: for advanced features
+                keypoints_list.append(feat['keypoints'])
+            if feat.get('bbox') is not None:  # NEW: for isolation
+                bboxes.append(feat['bbox'])
 
         # Compute aggregate statistics
         # LEARNING: We use mean, max, std to capture different aspects:
@@ -187,6 +208,51 @@ class FeatureAggregator:
             'max_acceleration': self._compute_max_acceleration(speeds, timestamps),
             'acceleration_spikes': self._compute_acceleration_spikes(speeds, timestamps, threshold=200),
         }
+
+        # ===== ADVANCED FEATURES (Critical Distress Indicators) =====
+        if self.advanced_extractor and len(keypoints_list) > 0:
+            # Get most recent keypoints for micro-postural analysis
+            latest_keypoints = keypoints_list[-1] if keypoints_list else None
+
+            if latest_keypoints is not None and len(latest_keypoints) >= 17:
+                # 1. Shoulder Hunch Index (tension marker)
+                agg['shoulder_hunch_index'] = self.advanced_extractor.compute_shoulder_hunch(latest_keypoints)
+
+                # 2. Closed Body Posture (psychological withdrawal)
+                agg['closed_body_posture'] = self.advanced_extractor.detect_closed_body_posture(latest_keypoints)
+
+                # 3. Hand-to-Face Proximity (distress/anxiety)
+                agg['hand_to_face_distance'] = self.advanced_extractor.compute_hand_to_face_proximity(latest_keypoints)
+
+                # 4. Head Yaw (track fixation)
+                agg['head_yaw_angle'] = self.advanced_extractor.compute_head_yaw(latest_keypoints)
+
+            # 5. Edge Transgression Count (hesitation loop - CRITICAL!)
+            agg['edge_transgression_count'] = self.advanced_extractor.compute_edge_transgression_count(
+                dist_to_edges, threshold=50.0
+            )
+
+            # 6. Weight Shifting Variance (nervous fidgeting)
+            if len(keypoints_list) >= 5:
+                # Extract hip positions from keypoints
+                hip_positions = []
+                for kp in keypoints_list:
+                    if kp is not None and len(kp) >= 17:
+                        left_hip_y = kp[11][1] if len(kp[11]) >= 2 else 0
+                        right_hip_y = kp[12][1] if len(kp[12]) >= 2 else 0
+                        hip_positions.append((left_hip_y, right_hip_y))
+
+                agg['weight_shifting_variance'] = self.advanced_extractor.compute_weight_shifting_variance(
+                    hip_positions, centers
+                )
+        else:
+            # Advanced features not available or no keypoints
+            agg['shoulder_hunch_index'] = None
+            agg['closed_body_posture'] = False
+            agg['hand_to_face_distance'] = None
+            agg['head_yaw_angle'] = None
+            agg['edge_transgression_count'] = 0
+            agg['weight_shifting_variance'] = None
 
         return agg
 

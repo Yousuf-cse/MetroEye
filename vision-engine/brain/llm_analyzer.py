@@ -48,14 +48,14 @@ class LLMAnalyzer:
     """
 
     def __init__(self,
-                 model: str = "llama3.1:8b",
+                 model: str = "phi3:mini",
                  base_url: str = "http://localhost:11434",
-                 timeout: float = 5.0):
+                 timeout: float = 30.0):
         """
         Initialize LLM analyzer.
 
         Args:
-            model: Ollama model name (default: llama3.1:8b)
+            model: Ollama model name (default: phi3:mini)
             base_url: Ollama server URL
             timeout: Max seconds to wait for LLM response
 
@@ -165,8 +165,16 @@ Focus on:
 - Prolonged dwelling near dangerous areas
 - Phone usage near edge (head_pitch >30° = looking down)
 - Sudden acceleration toward edge
+- Person size changes (bbox area decrease = crouching/sitting, may indicate distress)
 - Train arrival timing (critical if person near edge when train approaches)
 - Trains skipped (2+ skips = suspicious pattern)
+
+CRITICAL DISTRESS INDICATORS (HIGHEST PRIORITY):
+⭐ Edge Transgression Count ≥3 = HESITATION LOOP (strongest suicide indicator - IMMEDIATE intervention!)
+- Micro-postural stress markers: shoulder tension, defeated posture, closed body language, distress gestures
+- Track fixation (head yaw >45°) + near edge = fixating on tunnel entrance where train emerges
+- Facial emotion: sad/fear/anger combinations indicate severe distress
+- Combined indicators: If edge transgressions + distress posture + negative emotion → CRITICAL EMERGENCY
 
 Be concise, clear, and actionable. Consider ALL context when assessing risk.
 
@@ -190,13 +198,37 @@ Movement & Posture:
 - Acceleration spikes: {features.get('acceleration_spikes', 0)} (>3=erratic)
 - Direction changes: {features.get('direction_changes', 0)} (>5=pacing)
 
+Person Size & Position (Bounding Box):
+- Mean bbox width: {features.get('mean_bbox_width', 'N/A')} px
+- Mean bbox height: {features.get('mean_bbox_height', 'N/A')} px
+- Mean bbox area: {features.get('mean_bbox_area', 'N/A')} px² (smaller=farther away or crouching)
+
 Edge Proximity:
 - Min distance to platform edge: {features.get('min_dist_to_edge', 'N/A')} px (<50px=danger zone)
 - Dwell time near edge: {features.get('dwell_time_near_edge', 0):.1f}s (>5s=suspicious)
 
-Phone Usage Detection (NEW!):
+Phone Usage Detection:
 - Mean head pitch: {features.get('mean_head_pitch', 'N/A')}° (>30°=looking down, likely phone)
-- Time looking down: {features.get('time_looking_down', 0):.1f}s"""
+- Time looking down: {features.get('time_looking_down', 0):.1f}s
+
+CRITICAL DISTRESS INDICATORS (Advanced Behavioral Analysis):
+Edge Transgression Pattern (⭐ MOST CRITICAL):
+- Edge transgression count: {features.get('edge_transgression_count', 0)} (≥3 = HESITATION LOOP! Extremely high risk)
+- This detects repeated approach-retreat cycles at platform edge
+
+Micro-Postural Stress Markers:
+- Shoulder hunch index: {features.get('shoulder_hunch_index', 'N/A')} (<-0.3=tension, >0.4=defeated posture)
+- Closed body posture: {'YES - arms crossed/self-hugging (withdrawal)' if features.get('closed_body_posture') else 'No'}
+- Hand-to-face distance: {features.get('hand_to_face_distance', 'N/A')} px (<100px = distress gestures)
+
+Attention & Fixation:
+- Head yaw angle: {features.get('head_yaw_angle', 'N/A')}° (>45° = fixating on tunnel entrance)
+- Weight shifting variance: {features.get('weight_shifting_variance', 'N/A')} (>50 = nervous fidgeting)
+
+Facial Emotion Recognition (if available):
+- Dominant emotion: {features.get('dominant_emotion', 'N/A')} (detected from facial expression)
+- Emotion confidence: {features.get('emotion_confidence', 'N/A')}
+- Distress indicators: {features.get('distress_level', 'N/A')} (sad/fear/anger combinations)"""
 
         # Build RAG context section (if available)
         rag_section = ""
@@ -234,12 +266,20 @@ ANALYZE THIS SITUATION:
 4. Consider time of day: peak = crowding normal, off-peak = isolated behavior more suspicious
 5. Prioritize train arrival timing - risk is highest when train approaching
 
+CRITICAL PATTERN RECOGNITION (check these FIRST):
+6. ⭐ Edge transgression count ≥3 + near edge → CRITICAL EMERGENCY (hesitation loop = suicide attempt in progress!)
+7. Distress posture (defeated posture OR closed body + hand-to-face gestures) + near edge → HIGH RISK
+8. Track fixation (head yaw >45°) + near edge + train arriving <60s → CRITICAL (fixating on approaching train)
+9. Negative facial emotion (sad/fear/anger) + ANY distress indicator + near edge → ESCALATE RISK LEVEL
+10. Bbox area decrease (crouching/sitting) + near edge + other indicators → HIGH RISK (preparing to jump or in distress)
+11. Multiple advanced indicators (2+ of: edge transgressions, distress posture, track fixation, negative emotion, bbox changes) → CRITICAL
+
 Respond with ONLY this JSON format (no markdown):
 {
   "risk_level": "low|medium|high|critical",
   "confidence": 0.0-1.0,
-  "reasoning": "Brief explanation using CONTEXT (mention train timing, skipped trains, phone usage if relevant)",
-  "alert_message": "Natural language alert for security staff (INCLUDE context: station, train timing, etc.)",
+  "reasoning": "Brief explanation using CONTEXT AND ADVANCED FEATURES (mention edge transgressions, distress markers, emotion, train timing)",
+  "alert_message": "Natural language alert for security staff (INCLUDE context: station, train timing, specific distress indicators detected)",
   "recommended_action": "monitor|mic_warning|control_room|driver_alert"
 }"""
 
@@ -365,7 +405,41 @@ Respond with ONLY this JSON format (no markdown):
 
         # Build simple message
         message_parts = []
+        critical_indicators = []
 
+        # Check CRITICAL advanced features first
+        edge_transgressions = features.get('edge_transgression_count', 0)
+        if edge_transgressions >= 3:
+            critical_indicators.append(f"⚠ HESITATION LOOP ({edge_transgressions} edge transgressions)")
+        elif edge_transgressions >= 1:
+            message_parts.append(f"edge approach-retreat pattern ({edge_transgressions}x)")
+
+        # Distress posture indicators
+        shoulder_hunch = features.get('shoulder_hunch_index')
+        if shoulder_hunch is not None:
+            if shoulder_hunch > 0.4:
+                critical_indicators.append("defeated posture")
+            elif shoulder_hunch < -0.3:
+                message_parts.append("extreme tension")
+
+        if features.get('closed_body_posture'):
+            message_parts.append("withdrawn body language")
+
+        hand_face = features.get('hand_to_face_distance')
+        if hand_face is not None and hand_face < 100:
+            message_parts.append("distress gestures")
+
+        # Track fixation
+        head_yaw = features.get('head_yaw_angle')
+        if head_yaw is not None and abs(head_yaw) > 45:
+            message_parts.append(f"fixating on tunnel (yaw {abs(head_yaw):.0f}°)")
+
+        # Facial emotion
+        emotion = features.get('dominant_emotion')
+        if emotion and emotion in ['sad', 'fear', 'anger']:
+            message_parts.append(f"distressed emotion ({emotion})")
+
+        # Basic features
         dist = features.get('min_dist_to_edge')
         if dist is not None and dist < 100:
             message_parts.append(f"close to edge ({dist:.0f}px)")
@@ -382,7 +456,18 @@ Respond with ONLY this JSON format (no markdown):
         if changes > 5:
             message_parts.append(f"pacing ({changes} direction changes)")
 
-        if message_parts:
+        # Bbox area (crouching/sitting indicator)
+        bbox_area = features.get('mean_bbox_area')
+        if bbox_area is not None and bbox_area < 50000:  # Small bbox may indicate crouching
+            message_parts.append(f"unusual posture (small bbox area)")
+
+        # Build alert message
+        if critical_indicators:
+            details = " | ".join(critical_indicators)
+            if message_parts:
+                details += " | " + ", ".join(message_parts)
+            alert_message = f"🚨 {person_id} CRITICAL: {details}. Risk score: {risk_score}/100. IMMEDIATE INTERVENTION REQUIRED."
+        elif message_parts:
             details = ", ".join(message_parts)
             alert_message = f"{person_id} detected: {details}. Risk score: {risk_score}/100."
         else:

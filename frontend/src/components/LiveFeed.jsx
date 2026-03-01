@@ -246,6 +246,7 @@
  */
 
 import { useTracking } from '../hooks/useTracking';
+import CalibrationOverlay from './CalibrationOverlay';
 
 const palette = {
   bg: '#101014',
@@ -372,6 +373,9 @@ export default function LiveFeed({ cameraId, showStats = true, className = '' })
             e.target.nextElementSibling.style.display = 'flex';
           }}
         />
+
+        {/* Calibration Overlay - Shows calibration points on the live feed */}
+        <CalibrationOverlay cameraId={cameraId} />
 
         {/* Error/Loading Overlay */}
         <div

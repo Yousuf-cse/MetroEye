@@ -344,23 +344,63 @@ def main():
                            (x1, y1-25),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-                # Generate alert if risky and not in cooldown
-                if risk_level in ['medium', 'high', 'critical']:
+                # ============ THRESHOLD-BASED ALERT ROUTING ============
+                # HIGH RISK (≥85): Skip LLM for immediate response
+                # MEDIUM RISK (50-84): Use LLM for detailed analysis
+                # LOW RISK (<50): No alert
+                # =======================================================
+
+                CRITICAL_THRESHOLD = 85  # Skip LLM if risk >= this
+                MEDIUM_THRESHOLD = 50    # Minimum risk to generate alert
+
+                if risk_score >= MEDIUM_THRESHOLD:
                     last_alert_time = recent_alerts.get(track_id, 0)
 
                     if (ts - last_alert_time) > ALERT_COOLDOWN:
-                        # Call LLM analyzer
-                        llm_result = llm_analyzer.analyze(
-                            features=agg_features,
-                            risk_score=risk_score,
-                            track_id=track_id,
-                            camera_id=args.camera
-                        )
 
-                        # Log alert
-                        print(f"\n🚨 ALERT: Track #{track_id} - {risk_level.upper()}")
-                        print(f"   {llm_result['alert_message']}")
-                        print(f"   Action: {llm_result['recommended_action']}\n")
+                        # DECISION: Use LLM or fast path?
+                        if risk_score >= CRITICAL_THRESHOLD:
+                            # ⚡ FAST PATH: Critical risk - skip LLM for speed
+                            print(f"\n⚡ CRITICAL ALERT (Fast Path): Track #{track_id} - Risk {risk_score}")
+
+                            # Generate simple rule-based message
+                            alert_parts = [f"CRITICAL: Person #{track_id}"]
+                            if agg_features.get('min_dist_to_edge', 999) < 100:
+                                alert_parts.append(f"very close to edge ({agg_features['min_dist_to_edge']:.0f}px)")
+                            if agg_features.get('dwell_time_near_edge', 0) > 5:
+                                alert_parts.append(f"dwelling {agg_features['dwell_time_near_edge']:.1f}s")
+
+                            alert_message = " - ".join(alert_parts) + f" - Risk: {risk_score}/100"
+                            recommended_action = "driver_alert" if risk_score >= 90 else "control_room"
+
+                            llm_result = {
+                                'risk_level': risk_level,
+                                'confidence': 0.95,
+                                'reasoning': 'FAST PATH: Rule-based detection (LLM skipped for critical urgency)',
+                                'alert_message': alert_message,
+                                'recommended_action': recommended_action,
+                                'llm_used': False  # Important: marks this as fast-path
+                            }
+
+                            print(f"   {alert_message}")
+                            print(f"   Action: {recommended_action} (LLM SKIPPED)\n")
+
+                        else:
+                            # 🧠 LLM PATH: Medium risk - use LLM for context
+                            print(f"\n🧠 MEDIUM ALERT (LLM Path): Track #{track_id} - Risk {risk_score}")
+                            print(f"   Calling LLM for detailed analysis...")
+
+                            llm_result = llm_analyzer.analyze(
+                                features=agg_features,
+                                risk_score=risk_score,
+                                track_id=track_id,
+                                camera_id=args.camera
+                            )
+
+                            llm_result['llm_used'] = True  # Mark as LLM-analyzed
+
+                            print(f"   {llm_result['alert_message']}")
+                            print(f"   Action: {llm_result['recommended_action']} (LLM analyzed)\n")
 
                         # Send to backend API (if enabled)
                         if args.enable_api:

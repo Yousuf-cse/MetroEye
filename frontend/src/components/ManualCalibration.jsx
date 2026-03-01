@@ -24,6 +24,8 @@ export default function ManualCalibration({ cameraId }) {
   const [isLoading, setIsLoading] = useState(false);
   const [existingCalibration, setExistingCalibration] = useState(null);
   const [streamLoaded, setStreamLoaded] = useState(false);
+  const [calibrationType, setCalibrationType] = useState(null); // 'manual' or 'auto'
+  const [saveFeedback, setSaveFeedback] = useState(null); // Visual save feedback
 
   // Refs for DOM elements
   const videoRef = useRef(null);
@@ -199,6 +201,7 @@ export default function ManualCalibration({ cameraId }) {
 
     setIsLoading(true);
     setStatus('Saving manual calibration...');
+    setSaveFeedback('saving');
 
     try {
       const response = await axios.post(
@@ -210,15 +213,23 @@ export default function ManualCalibration({ cameraId }) {
         }
       );
 
-      setStatus(`✅ Manual calibration saved (${points.length} points)`);
+      setCalibrationType('manual');
+      setStatus(`✅ Manual calibration saved successfully (${points.length} points)`);
       setExistingCalibration(response.data.data);
+      setSaveFeedback('success');
 
-      console.log('Calibration saved:', response.data);
-      console.log('Normalized points:', response.data.normalized_points);
+      console.log('✅ Calibration saved:', response.data);
+      console.log('  - Points:', points.length);
+      console.log('  - Normalized:', response.data.data.platform_edge?.normalized);
+
+      // Clear feedback after 3 seconds
+      setTimeout(() => setSaveFeedback(null), 3000);
 
     } catch (error) {
       setStatus(`❌ Save failed: ${error.response?.data?.error || error.message}`);
+      setSaveFeedback('error');
       console.error('Save error:', error);
+      setTimeout(() => setSaveFeedback(null), 3000);
     } finally {
       setIsLoading(false);
     }
@@ -230,8 +241,12 @@ export default function ManualCalibration({ cameraId }) {
   const handleAutoCalibrate = async () => {
     setIsLoading(true);
     setStatus('Running auto-calibration (YOLO + Hough)...');
+    setSaveFeedback('saving');
 
     try {
+      // IMPORTANT: Clear manual points before auto-calibration
+      handleReset();
+
       // Call Node.js which will proxy to Python
       const response = await axios.post(
         `${BACKEND_URL}/api/calibration/${cameraId}/auto`,
@@ -244,21 +259,32 @@ export default function ManualCalibration({ cameraId }) {
       );
 
       if (response.data.success) {
+        setCalibrationType('auto');
         setStatus(`✅ Auto-calibration complete (${response.data.detection_method})`);
         setExistingCalibration(response.data.data);
+        setSaveFeedback('success');
 
         // Load detected points for visualization
         if (response.data.data.platform_edge?.absolute) {
-          setPoints(response.data.data.platform_edge.absolute);
-          drawPoints(response.data.data.platform_edge.absolute);
+          const autoPoints = response.data.data.platform_edge.absolute;
+          setPoints(autoPoints);
+          drawPoints(autoPoints);
+          console.log('✅ Auto-calibration points loaded:', autoPoints.length);
         }
+
+        // Clear feedback after 3 seconds
+        setTimeout(() => setSaveFeedback(null), 3000);
       } else {
         setStatus(`⚠️ Auto-calibration failed: ${response.data.error}`);
+        setSaveFeedback('error');
+        setTimeout(() => setSaveFeedback(null), 3000);
       }
 
     } catch (error) {
       setStatus(`❌ Auto-calibration error: ${error.response?.data?.error || error.message}`);
+      setSaveFeedback('error');
       console.error('Auto-calibration error:', error);
+      setTimeout(() => setSaveFeedback(null), 3000);
     } finally {
       setIsLoading(false);
     }
@@ -269,6 +295,8 @@ export default function ManualCalibration({ cameraId }) {
    */
   const handleReset = () => {
     setPoints([]);
+    setCalibrationType(null);
+    setSaveFeedback(null);
     if (canvasRef.current) {
       const ctx = canvasRef.current.getContext('2d');
       ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -280,13 +308,15 @@ export default function ManualCalibration({ cameraId }) {
    * Delete existing calibration
    */
   const handleDelete = async () => {
-    if (!window.confirm('Delete existing calibration?')) return;
+    if (!window.confirm('Delete existing calibration? This will clear all saved points.')) return;
 
     setIsLoading(true);
     try {
       await axios.delete(`${BACKEND_URL}/api/calibration/${cameraId}`);
       setExistingCalibration(null);
-      setStatus('Calibration deleted');
+      setCalibrationType(null);
+      setSaveFeedback(null);
+      setStatus('✅ Calibration deleted - ready for new calibration');
       handleReset();
     } catch (error) {
       setStatus(`❌ Delete failed: ${error.message}`);
@@ -330,9 +360,27 @@ export default function ManualCalibration({ cameraId }) {
 
       {/* Controls */}
       <div className="max-w-4xl mx-auto">
-        {/* Status Bar */}
+        {/* Status Bar with Save Feedback */}
         <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg mb-4 border-l-4 border-blue-600">
-          <span className="text-sm font-medium text-gray-700">{status}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-700">{status}</span>
+            {saveFeedback === 'saving' && (
+              <span className="flex items-center gap-2 text-blue-600 text-sm">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                Saving...
+              </span>
+            )}
+            {saveFeedback === 'success' && (
+              <span className="flex items-center gap-2 text-green-600 text-sm font-semibold animate-pulse">
+                ✅ Saved Successfully!
+              </span>
+            )}
+            {saveFeedback === 'error' && (
+              <span className="flex items-center gap-2 text-red-600 text-sm font-semibold animate-pulse">
+                ❌ Save Failed
+              </span>
+            )}
+          </div>
           {videoDimensions && (
             <span className="text-xs text-gray-600 bg-white px-3 py-1 rounded-full font-mono">
               {videoDimensions.width} × {videoDimensions.height}

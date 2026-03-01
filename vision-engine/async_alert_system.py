@@ -200,9 +200,13 @@ class AsyncAlertSystem:
         # Send to backend API
         self._send_to_backend(payload)
 
-        # Generate voice announcement (optional)
-        if risk_level in ['critical', 'high']:
-            self._generate_voice_announcement(description.get('voice_announcement', ''))
+        # Generate voice announcement (for all levels ≥ 0.40)
+        if risk_score >= 0.40:
+            self._generate_voice_announcement(
+                text=description.get('voice_announcement', ''),
+                risk_level=risk_level,
+                risk_score=risk_score  # Pass risk score for precise level mapping
+            )
 
         elapsed = time.time() - start_time
         print(f"✓ Alert processed in {elapsed:.2f}s (track {track_id})")
@@ -411,25 +415,61 @@ Format as JSON with those three keys. Be concise and urgent."""
             f.write(json.dumps(payload) + '\n')
         print(f"✓ Alert logged to file: {payload['alert_id']}")
 
-    def _generate_voice_announcement(self, text: str):
+    def _generate_voice_announcement(self, text: str, risk_level: str = "high", risk_score: float = 0.0):
         """
-        Generate voice announcement (optional)
+        Generate voice announcement using ElevenLabs streaming PA system
 
-        You can integrate with:
-        - TTS engines (pyttsx3, gTTS)
-        - External APIs (Google Cloud TTS, AWS Polly)
-        - PA system integration
+        Uses level-based announcements:
+        - Level 1 (0.40-0.79): Streaming TTS (75-300ms latency) - gentle intervention
+        - Level 2 (0.80-0.94): Pre-cached audio (<50ms) - critical alert
+        - Level 3 (≥0.95): Pre-cached audio (<50ms) - emergency
 
         Args:
             text: Text to speak
+            risk_level: Risk level string (determines announcement type)
+            risk_score: Numeric risk score for precise level mapping
         """
-        # TODO: Implement TTS if needed
-        print(f"🔊 Voice announcement: {text}")
-        # Example:
-        # import pyttsx3
-        # engine = pyttsx3.init()
-        # engine.say(text)
-        # engine.runAndWait()
+        try:
+            # Import PA system (lazy import to avoid circular dependency)
+            from pa_announcement_system import PAAnnouncement
+            import os
+
+            # Initialize PA system with ultra-low latency model if not already done
+            if not hasattr(self, 'pa_system'):
+                self.pa_system = PAAnnouncement(
+                    elevenlabs_api_key=os.getenv("ELEVENLABS_API_KEY"),
+                    use_elevenlabs=True,
+                    model="eleven_flash_v2_5"  # Ultra-low latency (~75ms)
+                )
+
+            # Map risk score to announcement level
+            if risk_score >= 0.95:
+                # Level 3: Emergency - use pre-cached announcement
+                print(f"🚨🚨 LEVEL 3 EMERGENCY (risk: {risk_score:.2f})")
+                self.pa_system.play_level3_announcement()
+            elif risk_score >= 0.80:
+                # Level 2: Critical - use pre-cached announcement
+                print(f"🚨 LEVEL 2 CRITICAL ALERT (risk: {risk_score:.2f})")
+                self.pa_system.play_level2_announcement()
+            elif risk_score >= 0.40:
+                # Level 1: Gentle intervention - use streaming (dynamic text)
+                print(f"⚠️ LEVEL 1 GENTLE INTERVENTION (risk: {risk_score:.2f})")
+                self.pa_system.play_custom_announcement(
+                    text=text,
+                    language="en",
+                    is_critical=False  # Uses streaming for lowest latency
+                )
+            else:
+                # Below threshold, no announcement
+                print(f"ℹ️ Risk score {risk_score:.2f} below announcement threshold (0.40)")
+                return
+
+            print(f"🔊 Voice announcement triggered: {text[:50]}...")
+
+        except Exception as e:
+            print(f"⚠ Voice announcement failed: {e}")
+            # Fallback: just print
+            print(f"🔊 Voice announcement (fallback): {text}")
 
 
 # Example usage
