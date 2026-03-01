@@ -297,7 +297,7 @@ class RuleBasedScorer:
             score: Risk score (0-100)
 
         Returns:
-            'normal', 'low', 'medium', 'high', or 'critical'
+            'low', 'medium', 'high', or 'critical' (matches backend enum)
         """
         if score >= self.thresholds['critical']:
             return 'critical'
@@ -305,10 +305,8 @@ class RuleBasedScorer:
             return 'high'
         elif score >= self.thresholds['medium']:
             return 'medium'
-        elif score >= self.thresholds['low']:
-            return 'low'
         else:
-            return 'normal'
+            return 'low'  # Changed from 'normal' to match backend validation
 
 
     def explain_score(self) -> str:
