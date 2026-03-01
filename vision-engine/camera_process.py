@@ -121,7 +121,7 @@ def extract_tracking_data_optimized(result, camera_id: str, track_history, last_
     alert = None
 
     # Threshold configuration
-    MEDIUM_THRESHOLD = 20  # Medium risk triggers LLM analysis
+    MEDIUM_THRESHOLD = 60  # Medium risk triggers LLM analysis (raised from 40 - CPU bottleneck)
     CRITICAL_THRESHOLD = 85
     ALERT_COOLDOWN = 10.0
 
@@ -452,7 +452,15 @@ class CameraProcess(mp.Process):
             return
 
         model = YOLO('yolo26n-pose.pt')
-        logger.info(f"✅ {self.camera_id}: YOLO model loaded")
+
+        # Force GPU usage if available
+        import torch
+        if torch.cuda.is_available():
+            model.to('cuda')
+            logger.info(f"✅ {self.camera_id}: YOLO model loaded on GPU (CUDA)")
+        else:
+            logger.warning(f"⚠️ {self.camera_id}: YOLO model loaded on CPU (CUDA not available)")
+            logger.info(f"✅ {self.camera_id}: YOLO model loaded")
 
         # Initialize brain modules
         aggregator = None
@@ -466,7 +474,7 @@ class CameraProcess(mp.Process):
         face_service = None
         if self.config.get('face_recognition_enabled', False) and FACE_RECOGNITION_AVAILABLE:
             try:
-                face_service = FaceRecognitionService(backend_url="http://localhost:8000")
+                face_service = FaceRecognitionService()
                 logger.info(f"✅ {self.camera_id}: Face recognition enabled")
             except Exception as e:
                 logger.warning(f"⚠️ {self.camera_id}: Face recognition failed: {e}")

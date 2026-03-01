@@ -79,6 +79,99 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Import PA announcement system (after logger setup)
+try:
+    from pa_announcement_system import PAAnnouncement
+    PA_SYSTEM_AVAILABLE = True
+    logger.info("✓ PA announcement system available")
+except ImportError:
+    PA_SYSTEM_AVAILABLE = False
+    logger.warning("⚠ PA announcement system not available")
+
+# ============ EDGE PROXIMITY TRACKER ============
+
+class EdgeProximityTracker:
+    """
+    Tracks how long each person has been near the platform edge
+    Triggers PA announcements when dwell time exceeds threshold
+    """
+
+    def __init__(self, distance_threshold: float = 100.0, dwell_threshold: float = 5.0, announcement_cooldown: float = 15.0):
+        """
+        Args:
+            distance_threshold: Max distance from edge to be considered "near" (pixels)
+            dwell_threshold: Minimum time near edge before alert (seconds)
+            announcement_cooldown: Min seconds between announcements for same person
+        """
+        self.distance_threshold = distance_threshold
+        self.dwell_threshold = dwell_threshold
+        self.announcement_cooldown = announcement_cooldown
+
+        # Track when each person first got near the edge
+        self.near_edge_since = {}  # track_id -> timestamp when they got near edge
+
+        # Track when we last triggered an announcement for each person
+        self.last_announcement_time = {}  # track_id -> timestamp of last announcement
+
+    def update(self, track_id: int, dist_to_edge: float, timestamp: float) -> dict:
+        """
+        Update proximity tracking for a person
+
+        Args:
+            track_id: Person track ID
+            dist_to_edge: Current distance from edge (pixels)
+            timestamp: Current timestamp
+
+        Returns:
+            dict: Alert info if announcement should be triggered, None otherwise
+        """
+        # Check if person is near the edge
+        is_near_edge = dist_to_edge < self.distance_threshold
+
+        if is_near_edge:
+            # Person is near edge
+            if track_id not in self.near_edge_since:
+                # First time near edge, start tracking
+                self.near_edge_since[track_id] = timestamp
+                logger.info(f"⚠️ Track {track_id} entered danger zone ({dist_to_edge:.0f}px from edge)")
+
+            # Calculate how long they've been near edge
+            time_near_edge = timestamp - self.near_edge_since[track_id]
+
+            # Check if we should trigger an announcement
+            if time_near_edge >= self.dwell_threshold:
+                # Check cooldown
+                last_announcement = self.last_announcement_time.get(track_id, 0)
+                if (timestamp - last_announcement) >= self.announcement_cooldown:
+                    # Trigger announcement!
+                    self.last_announcement_time[track_id] = timestamp
+
+                    return {
+                        'should_announce': True,
+                        'time_near_edge': time_near_edge,
+                        'distance': dist_to_edge,
+                        'reason': f'Person has been near edge for {time_near_edge:.1f}s'
+                    }
+        else:
+            # Person moved away from edge, reset tracking
+            if track_id in self.near_edge_since:
+                time_near_edge = timestamp - self.near_edge_since[track_id]
+                logger.info(f"✓ Track {track_id} left danger zone (was there for {time_near_edge:.1f}s)")
+                del self.near_edge_since[track_id]
+
+        return {'should_announce': False}
+
+    def cleanup_old_tracks(self, active_tracks: set, timestamp: float):
+        """Remove tracking for tracks that no longer exist"""
+        to_remove = []
+        for track_id in list(self.near_edge_since.keys()):
+            if track_id not in active_tracks:
+                to_remove.append(track_id)
+        for track_id in to_remove:
+            del self.near_edge_since[track_id]
+            if track_id in self.last_announcement_time:
+                del self.last_announcement_time[track_id]
+
 # Create FastAPI app
 app = FastAPI(
     title="MetroEye Vision Engine API (Optimized)",
@@ -117,7 +210,7 @@ ALERT_COOLDOWN = 10.0
 
 # Threshold configuration for LLM routing
 CRITICAL_THRESHOLD = 85
-MEDIUM_THRESHOLD = 20  # Medium risk triggers LLM analysis
+MEDIUM_THRESHOLD = 50  # Medium risk triggers LLM analysis (changed from 20 - too low!)
 
 # ============ PER-CAMERA CONFIGURATION ============
 class CameraConfig:
@@ -394,10 +487,24 @@ class TrackingDataConsumer:
 
                                 # Define callback to send alert after LLM analysis (with proper closure)
                                 def make_llm_callback(alert_dict, cam_id):
-                                    def callback(llm_result):
-                                        alert_dict['llm_analysis'] = llm_result
+                                    def callback(llm_result, error):
+                                        if error:
+                                            # LLM failed, use fallback
+                                            logger.error(f"❌ {cam_id}: LLM failed for track {alert_dict['track_id']}: {error}")
+                                            alert_dict['llm_analysis'] = {
+                                                'risk_level': alert_dict.get('risk_level', 'medium'),
+                                                'confidence': 0.5,
+                                                'reasoning': f"LLM analysis failed: {error}. Using rule-based assessment.",
+                                                'alert_message': f"Alert for track #{alert_dict['track_id']} - Risk {alert_dict.get('risk_score', 0)}/100",
+                                                'recommended_action': 'monitor',
+                                                'llm_used': False
+                                            }
+                                        else:
+                                            # LLM succeeded
+                                            alert_dict['llm_analysis'] = llm_result
+
                                         alert_dict['needs_llm'] = False
-                                        logger.info(f"✅ {cam_id}: LLM analysis complete for track {alert_dict['track_id']}, sending alert")
+                                        logger.info(f"✅ {cam_id}: Alert ready for track {alert_dict['track_id']}, sending to backend")
                                         async_http_client.send_async("/api/alerts/from-detection", alert_dict)
                                     return callback
 
@@ -525,7 +632,8 @@ def extract_tracking_data_optimized(
     track_history, last_positions, first_seen, platform_poly,
     aggregator, scorer, recent_alerts, pending_llm_alerts, ts,
     frame=None, face_service=None, emotion_service=None,
-    advanced_features_extractor=None, location="Unknown"
+    advanced_features_extractor=None, location="Unknown",
+    pa_system=None, edge_tracker=None
 ):
     """
     OPTIMIZED tracking data extraction with:
@@ -691,6 +799,44 @@ def extract_tracking_data_optimized(
                     risk_score = min(100, risk_score + risk_boost)
 
                 risk_level = scorer.get_risk_level(risk_score)
+
+                # ============ EDGE PROXIMITY PA ANNOUNCEMENT ============
+                # Check if person has been near edge for too long
+                if edge_tracker and pa_system and dist_edge < 200:  # Only check if reasonably close
+                    proximity_status = edge_tracker.update(track_id, dist_edge, ts)
+
+                    if proximity_status.get('should_announce'):
+                        # Calculate normalized risk score (0-1 scale)
+                        risk_score_normalized = risk_score / 100.0
+
+                        logger.warning(f"🔊 PA ANNOUNCEMENT TRIGGERED for Track {track_id}")
+                        logger.warning(f"   Risk Score: {risk_score}/100 ({risk_score_normalized:.2f})")
+                        logger.warning(f"   Distance: {dist_edge:.0f}px")
+                        logger.warning(f"   Time near edge: {proximity_status['time_near_edge']:.1f}s")
+
+                        # Trigger PA announcement in background thread (non-blocking)
+                        def trigger_pa_announcement():
+                            try:
+                                if risk_score_normalized >= 0.95:
+                                    # Level 3: Emergency - pre-cached announcement
+                                    logger.info(f"🚨🚨 LEVEL 3 EMERGENCY PA (risk: {risk_score_normalized:.2f})")
+                                    pa_system.play_level3_announcement()
+                                elif risk_score_normalized >= 0.80:
+                                    # Level 2: Critical - pre-cached announcement
+                                    logger.info(f"🚨 LEVEL 2 CRITICAL PA (risk: {risk_score_normalized:.2f})")
+                                    pa_system.play_level2_announcement()
+                                elif risk_score_normalized >= 0.40:
+                                    # Level 1: Gentle intervention - streaming
+                                    logger.info(f"⚠️ LEVEL 1 GENTLE PA (risk: {risk_score_normalized:.2f})")
+                                    pa_system.play_level1_announcement(platform=camera_id)
+                                else:
+                                    logger.info(f"ℹ️ Risk {risk_score_normalized:.2f} below PA threshold")
+                            except Exception as e:
+                                logger.error(f"❌ PA announcement failed: {e}")
+
+                        # Run in background to avoid blocking detection
+                        import threading
+                        threading.Thread(target=trigger_pa_announcement, daemon=True).start()
 
                 # ============ OPTIMIZED ALERT ROUTING ============
                 if risk_score >= MEDIUM_THRESHOLD:
@@ -1070,6 +1216,29 @@ def run_detection_optimized(camera_id: str, video_source: str, config: CameraCon
     if platform_poly:
         logger.info(f"✓ Platform calibrated: {len(platform_poly)} vertices")
 
+    # Initialize PA announcement system
+    pa_system = None
+    if PA_SYSTEM_AVAILABLE:
+        try:
+            import os
+            pa_system = PAAnnouncement(
+                elevenlabs_api_key=os.getenv("ELEVENLABS_API_KEY"),
+                use_elevenlabs=True,
+                model="eleven_flash_v2_5"  # Ultra-low latency (~75ms)
+            )
+            logger.info("🔊 PA announcement system initialized with ElevenLabs streaming")
+        except Exception as e:
+            logger.warning(f"⚠ PA system initialization failed: {e}")
+            pa_system = None
+
+    # Initialize edge proximity tracker
+    edge_tracker = EdgeProximityTracker(
+        distance_threshold=100.0,  # pixels - how close is "too close"
+        dwell_threshold=5.0,  # seconds - how long at edge triggers alert
+        announcement_cooldown=15.0  # seconds between announcements
+    )
+    logger.info("✓ Edge proximity tracker initialized (100px, 5s dwell, 15s cooldown)")
+
     # Tracking state
     track_history = defaultdict(lambda: deque())
     last_positions = {}
@@ -1168,11 +1337,19 @@ def run_detection_optimized(camera_id: str, video_source: str, config: CameraCon
                     face_service=face_service,
                     emotion_service=emotion_service,
                     advanced_features_extractor=advanced_features_extractor,
-                    location=f"Platform {camera_id}"
+                    location=f"Platform {camera_id}",
+                    pa_system=pa_system,
+                    edge_tracker=edge_tracker
                 )
 
                 if tracking_data['objects']:
                     send_tracking_data_async(camera_id, tracking_data)
+
+                # Periodic cleanup of edge tracker (every 100 frames)
+                if edge_tracker and config.frame_count % 100 == 0:
+                    active_tracks = {obj['track_id'] for obj in tracking_data['objects']}
+                    edge_tracker.cleanup_old_tracks(active_tracks, ts)
+
             except Exception as e:
                 logger.error(f"❌ {camera_id}: Tracking data extraction error: {e}")
                 # Continue processing even if tracking fails
@@ -1351,14 +1528,14 @@ if __name__ == "__main__":
                 face_detection_interval=30,       # Face every 30 frames (~1.5s at 20fps) - INCREASED for performance
                 emotion_detection_interval=30,    # Emotion every 30 frames - INCREASED for performance
                 advanced_features_enabled=False,  # DISABLED for performance - can enable later if smooth
-                tracking_data_interval=15,        # Send data every 15 frames - INCREASED for performance
+                tracking_data_interval=20,        # Send data every 15 frames - INCREASED for performance
                 stream_fps=20,                    # Stream at 20 FPS
-                jpeg_quality=50                   # Medium quality
+                jpeg_quality=40                   # Medium quality
             )
         },
         {
             "camera_id": "camera_2",
-            "video_source": "sample2.0.mp4",
+            "video_source": "sample4.mp4",
             "config": CameraConfig(
                 camera_id="camera_2",
                 face_recognition_enabled=False,   # DISABLE face recognition for this camera
@@ -1366,9 +1543,26 @@ if __name__ == "__main__":
                 face_detection_interval=30,       # (Ignored if disabled)
                 emotion_detection_interval=30,    # (Ignored if disabled)
                 advanced_features_enabled=False,  # DISABLED for maximum performance
-                tracking_data_interval=15,        # Send data every 15 frames
+                tracking_data_interval=20,        # Send data every 15 frames
                 stream_fps=20,
-                jpeg_quality=45                   # Slightly lower quality for performance
+                jpeg_quality=40                  # Slightly lower quality for performance
+            )
+        },
+ {
+            "camera_id": "camera_3",
+            "video_source": 0,  # 0 = Default webcam, change to RTSP URL if using IP camera
+            # For IP camera: "rtsp://username:password@ip:port/stream"
+            # For USB camera index: 0, 1, 2, etc.
+            "config": CameraConfig(
+                camera_id="camera_3",
+                face_recognition_enabled=False,    # ❌ DISABLED for performance - enable after GPU optimization
+                emotion_detection_enabled=False,   # ❌ DISABLED for performance - enable after GPU optimization
+                face_detection_interval=25,        # (Ignored if disabled)
+                emotion_detection_interval=25,     # (Ignored if disabled)
+                advanced_features_enabled=False,   # ❌ DISABLED for performance - enable after GPU optimization
+                tracking_data_interval=20,         # Send updates every 20 frames - matches other cameras
+                stream_fps=20,                     # 20 FPS - matches other cameras for consistency
+                jpeg_quality=40                    # Medium quality - matches other cameras
             )
         },
     ]

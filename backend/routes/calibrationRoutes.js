@@ -22,7 +22,10 @@ const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 
-// Path to calibration configs (saved by Python)
+// Import Calibration model for MongoDB
+const Calibration = require('../models/Calibration');
+
+// Path to calibration configs (saved by Python - for backward compatibility)
 const CONFIGS_DIR = path.join(__dirname, '../../vision-engine/configs');
 const PYTHON_SCRIPT = path.join(__dirname, '../../vision-engine/edge_calibrator.py');
 
@@ -60,10 +63,34 @@ function normalizeCoordinates(pixelPoints, width, height) {
  */
 router.get('/:cameraId', async (req, res) => {
   const { cameraId } = req.params;
-  const configPath = getConfigPath(cameraId);
 
   try {
-    // Check if calibration exists
+    // ========== TRY MONGODB FIRST ==========
+    const calibrationDoc = await Calibration.findOne({ camera_id: cameraId });
+
+    if (calibrationDoc) {
+      console.log(`✅ Loaded calibration from MongoDB: ${calibrationDoc._id}`);
+
+      return res.json({
+        camera_id: cameraId,
+        calibrated: true,
+        source: 'mongodb',
+        data: {
+          detection_method: calibrationDoc.detection_method,
+          video_dimensions: calibrationDoc.video_dimensions,
+          platform_edge: {
+            normalized: calibrationDoc.normalized_points,
+            absolute: calibrationDoc.absolute_points
+          },
+          num_points: calibrationDoc.normalized_points.length,
+          calibrated_at: calibrationDoc.calibrated_at
+        }
+      });
+    }
+    // =======================================
+
+    // ========== FALLBACK TO JSON FILE (for backward compatibility) ==========
+    const configPath = getConfigPath(cameraId);
     const exists = fsSync.existsSync(configPath);
 
     if (!exists) {
@@ -74,13 +101,16 @@ router.get('/:cameraId', async (req, res) => {
       });
     }
 
-    // Load calibration data
+    // Load calibration data from file
     const configData = await fs.readFile(configPath, 'utf-8');
     const config = JSON.parse(configData);
+
+    console.log(`✅ Loaded calibration from file: ${configPath}`);
 
     res.json({
       camera_id: cameraId,
       calibrated: true,
+      source: 'file',
       data: {
         detection_method: config.detection_method,
         video_dimensions: config.video_dimensions,
@@ -89,6 +119,7 @@ router.get('/:cameraId', async (req, res) => {
         video_source: config.video_source
       }
     });
+    // ========================================================================
 
   } catch (error) {
     console.error('Error loading calibration:', error);
@@ -188,7 +219,19 @@ router.post('/:cameraId/manual', async (req, res) => {
     // Normalize the points
     const normalizedPoints = normalizeCoordinates(points, width, height);
 
-    // Create calibration config
+    // ========== SAVE TO MONGODB ==========
+    const calibrationDoc = await Calibration.createOrUpdate(
+      cameraId,
+      points,
+      { width, height },
+      'manual',
+      'frontend_user'
+    );
+
+    console.log(`✅ Saved calibration to MongoDB: ${calibrationDoc._id}`);
+    // =====================================
+
+    // ========== ALSO SAVE TO JSON FILE (for Python to read) ==========
     const config = {
       camera_id: cameraId,
       video_dimensions: { width, height },
@@ -205,13 +248,14 @@ router.post('/:cameraId/manual', async (req, res) => {
     // Ensure configs directory exists
     await fs.mkdir(CONFIGS_DIR, { recursive: true });
 
-    // Save configuration
+    // Save configuration file
     const configPath = getConfigPath(cameraId);
     await fs.writeFile(configPath, JSON.stringify(config, null, 2));
 
-    console.log(`✓ Saved manual calibration for ${cameraId}`);
-    console.log(`  Points: ${points.length}`);
-    console.log(`  Resolution: ${width}x${height}`);
+    console.log(`✅ Saved calibration to file: ${configPath}`);
+    console.log(`   Points: ${points.length}`);
+    console.log(`   Resolution: ${width}x${height}`);
+    // ==================================================================
 
     // Broadcast to WebSocket clients
     const io = req.app.get('io');
@@ -228,6 +272,7 @@ router.post('/:cameraId/manual', async (req, res) => {
       camera_id: cameraId,
       detection_method: 'manual',
       num_points: points.length,
+      mongodb_id: calibrationDoc._id,
       data: config
     });
 
@@ -337,20 +382,34 @@ router.post('/:cameraId/auto', async (req, res) => {
  */
 router.delete('/:cameraId', async (req, res) => {
   const { cameraId } = req.params;
-  const configPath = getConfigPath(cameraId);
 
   try {
+    let deleted = false;
+
+    // ========== DELETE FROM MONGODB ==========
+    const mongoResult = await Calibration.deleteOne({ camera_id: cameraId });
+    if (mongoResult.deletedCount > 0) {
+      console.log(`✅ Deleted calibration from MongoDB: ${cameraId}`);
+      deleted = true;
+    }
+    // =========================================
+
+    // ========== DELETE JSON FILE ==========
+    const configPath = getConfigPath(cameraId);
     const exists = fsSync.existsSync(configPath);
 
-    if (!exists) {
+    if (exists) {
+      await fs.unlink(configPath);
+      console.log(`✅ Deleted calibration file: ${configPath}`);
+      deleted = true;
+    }
+    // ======================================
+
+    if (!deleted) {
       return res.status(404).json({
         error: 'No calibration found for this camera'
       });
     }
-
-    await fs.unlink(configPath);
-
-    console.log(`✓ Deleted calibration for ${cameraId}`);
 
     // Broadcast to WebSocket clients
     const io = req.app.get('io');

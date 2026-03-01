@@ -5,6 +5,27 @@ import io from 'socket.io-client';
 const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:8000';
 const socket = io(API_BASE);
 
+// Retro/Brutalist theme matching the calibration UI
+const palette = {
+  bg: '#101014',
+  surface: '#18181c',
+  surfaceHover: '#1f1f25',
+  border: '#2a2a32',
+  borderActive: '#e04040',
+  text: '#e8e8ec',
+  textMuted: '#6b6b78',
+  accent: '#e04040',
+  safe: '#34d399',
+  warn: '#fbbf24',
+  critical: '#ea580c',
+  info: '#3b82f6',
+};
+
+const font = {
+  mono: "'JetBrains Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace",
+  display: "'Inter', 'Helvetica Neue', Arial, sans-serif",
+};
+
 export default function AlertList() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -114,11 +135,20 @@ export default function AlertList() {
 
   const getRiskColor = (level) => {
     switch (level) {
-      case 'critical': return '#d32f2f';
-      case 'high': return '#f57c00';
-      case 'medium': return '#ffa726';
-      case 'low': return '#fdd835';
-      default: return '#9e9e9e';
+      case 'critical': return palette.accent;
+      case 'high': return palette.critical;
+      case 'medium': return palette.warn;
+      case 'low': return palette.safe;
+      default: return palette.textMuted;
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending': return { bg: `${palette.warn}20`, border: palette.warn, text: palette.warn };
+      case 'handled': return { bg: `${palette.safe}20`, border: palette.safe, text: palette.safe };
+      case 'false_alarm': return { bg: `${palette.textMuted}20`, border: palette.textMuted, text: palette.textMuted };
+      default: return { bg: `${palette.border}`, border: palette.border, text: palette.textMuted };
     }
   };
 
@@ -130,37 +160,108 @@ export default function AlertList() {
   };
 
   return (
-    <div style={{ padding: 20, maxWidth: 1400, margin: '0 auto' }}>
-      <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-        <h2 style={{ margin: 0 }}>Live Alerts</h2>
+    <div style={{
+      padding: 20,
+      maxWidth: 1400,
+      margin: '0 auto',
+      background: palette.bg,
+      minHeight: '100vh',
+    }}>
+      <div style={{
+        marginBottom: 20,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 16,
+        padding: '16px 0',
+        borderBottom: `2px solid ${palette.border}`,
+      }}>
+        <h2 style={{
+          margin: 0,
+          fontFamily: font.mono,
+          fontSize: '1.5rem',
+          color: palette.text,
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+        }}>🚨 Live Alerts</h2>
 
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div>
-            <label style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Start Date:</label>
+            <label style={{
+              fontSize: '0.65rem',
+              display: 'block',
+              marginBottom: 6,
+              fontFamily: font.mono,
+              color: palette.textMuted,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+            }}>Start Date</label>
             <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              style={{ padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 0,
+                border: `1px solid ${palette.border}`,
+                background: palette.surface,
+                color: palette.text,
+                fontFamily: font.mono,
+                fontSize: '0.75rem',
+              }}
             />
           </div>
 
           <div>
-            <label style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>End Date:</label>
+            <label style={{
+              fontSize: '0.65rem',
+              display: 'block',
+              marginBottom: 6,
+              fontFamily: font.mono,
+              color: palette.textMuted,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+            }}>End Date</label>
             <input
               type="date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              style={{ padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 0,
+                border: `1px solid ${palette.border}`,
+                background: palette.surface,
+                color: palette.text,
+                fontFamily: font.mono,
+                fontSize: '0.75rem',
+              }}
             />
           </div>
 
           <div>
-            <label style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Status:</label>
+            <label style={{
+              fontSize: '0.65rem',
+              display: 'block',
+              marginBottom: 6,
+              fontFamily: font.mono,
+              color: palette.textMuted,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+            }}>Status</label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              style={{ padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 0,
+                border: `1px solid ${palette.border}`,
+                background: palette.surface,
+                color: palette.text,
+                fontFamily: font.mono,
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+              }}
             >
               <option value="">All</option>
               <option value="pending">Pending</option>
@@ -170,11 +271,28 @@ export default function AlertList() {
           </div>
 
           <div>
-            <label style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Risk Level:</label>
+            <label style={{
+              fontSize: '0.65rem',
+              display: 'block',
+              marginBottom: 6,
+              fontFamily: font.mono,
+              color: palette.textMuted,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+            }}>Risk Level</label>
             <select
               value={filterRiskLevel}
               onChange={(e) => setFilterRiskLevel(e.target.value)}
-              style={{ padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 0,
+                border: `1px solid ${palette.border}`,
+                background: palette.surface,
+                color: palette.text,
+                fontFamily: font.mono,
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+              }}
             >
               <option value="">All</option>
               <option value="critical">Critical</option>
@@ -186,7 +304,27 @@ export default function AlertList() {
 
           <button
             onClick={clearFilters}
-            style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #ccc', background: '#fff', cursor: 'pointer', alignSelf: 'flex-end' }}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 0,
+              border: `1px solid ${palette.border}`,
+              background: palette.surface,
+              color: palette.text,
+              cursor: 'pointer',
+              fontFamily: font.mono,
+              fontSize: '0.7rem',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = palette.surfaceHover;
+              e.target.style.borderColor = palette.textMuted;
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = palette.surface;
+              e.target.style.borderColor = palette.border;
+            }}
           >
             Clear Filters
           </button>
@@ -200,57 +338,102 @@ export default function AlertList() {
             ref={index === alerts.length - 1 ? lastAlertRef : null}
             style={{
               border: `2px solid ${getRiskColor(alert.risk_level)}`,
-              padding: 16,
-              borderRadius: 8,
-              background: '#fff',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+              padding: 20,
+              borderRadius: 0,
+              background: palette.surface,
+              boxShadow: `0 0 20px ${getRiskColor(alert.risk_level)}20, 0 4px 12px rgba(0,0,0,0.6)`,
+              transition: 'all 0.2s ease',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                  <strong style={{ fontSize: 16 }}>{alert.camera_id}</strong>
-                  <span style={{ fontSize: 14, color: '#666' }}>Track #{alert.track_id}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <strong style={{
+                    fontSize: '1rem',
+                    fontFamily: font.mono,
+                    color: palette.text,
+                    letterSpacing: '0.05em',
+                  }}>📹 {alert.camera_id}</strong>
                   <span style={{
-                    padding: '2px 8px',
-                    borderRadius: 4,
+                    fontSize: '0.75rem',
+                    fontFamily: font.mono,
+                    color: palette.textMuted,
+                  }}>Track #{alert.track_id}</span>
+                  <span style={{
+                    padding: '4px 10px',
+                    borderRadius: 0,
                     background: getRiskColor(alert.risk_level),
-                    color: '#fff',
-                    fontSize: 12,
-                    fontWeight: 'bold'
+                    color: palette.text,
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    fontFamily: font.mono,
+                    letterSpacing: '0.1em',
                   }}>
                     {alert.risk_level?.toUpperCase() || 'UNKNOWN'}
                   </span>
-                  <span style={{ fontSize: 14, fontWeight: 'bold', color: getRiskColor(alert.risk_level) }}>
+                  <span style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    fontFamily: font.mono,
+                    color: getRiskColor(alert.risk_level),
+                  }}>
                     {alert.risk_score}/100
                   </span>
                 </div>
-                <div style={{ fontSize: 14, color: '#666' }}>
+                <div style={{
+                  fontSize: '0.7rem',
+                  fontFamily: font.mono,
+                  color: palette.textMuted,
+                  letterSpacing: '0.02em',
+                }}>
                   {new Date(alert.timestamp).toLocaleString()}
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <span style={{
-                  padding: '4px 8px',
-                  borderRadius: 4,
-                  background: alert.status === 'pending' ? '#fff3cd' : alert.status === 'handled' ? '#d4edda' : '#f8d7da',
-                  fontSize: 12,
-                  border: '1px solid #ddd'
-                }}>
-                  {alert.status}
-                </span>
+                {(() => {
+                  const statusColors = getStatusColor(alert.status);
+                  return (
+                    <span style={{
+                      padding: '6px 12px',
+                      borderRadius: 0,
+                      background: statusColors.bg,
+                      fontSize: '0.65rem',
+                      border: `1px solid ${statusColors.border}`,
+                      color: statusColors.text,
+                      fontFamily: font.mono,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      fontWeight: 600,
+                    }}>
+                      {alert.status}
+                    </span>
+                  );
+                })()}
                 {alert.status === 'pending' && (
                   <button
                     onClick={() => ack(alert._id)}
                     style={{
-                      padding: '4px 12px',
-                      borderRadius: 4,
-                      border: 'none',
-                      background: '#28a745',
-                      color: '#fff',
+                      padding: '6px 16px',
+                      borderRadius: 0,
+                      border: `1px solid ${palette.safe}`,
+                      background: palette.safe,
+                      color: palette.bg,
                       cursor: 'pointer',
-                      fontSize: 12
+                      fontSize: '0.65rem',
+                      fontFamily: font.mono,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      fontWeight: 700,
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = 'transparent';
+                      e.target.style.color = palette.safe;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = palette.safe;
+                      e.target.style.color = palette.bg;
                     }}
                   >
                     Acknowledge
@@ -259,31 +442,99 @@ export default function AlertList() {
               </div>
             </div>
 
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Alert Message:</div>
-              <div style={{ fontSize: 14 }}>{alert.alert_message || 'No message'}</div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{
+                fontWeight: 700,
+                marginBottom: 6,
+                fontFamily: font.mono,
+                fontSize: '0.65rem',
+                color: palette.textMuted,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+              }}>Alert Message</div>
+              <div style={{
+                fontSize: '0.85rem',
+                fontFamily: font.mono,
+                color: palette.text,
+                lineHeight: '1.5',
+              }}>{alert.alert_message || 'No message'}</div>
             </div>
 
             {alert.llm_reasoning && alert.llm_reasoning !== 'Alert processed by vision engine' && (
-              <div style={{ marginBottom: 12, padding: 12, background: '#f8f9fa', borderRadius: 4 }}>
-                <div style={{ fontWeight: 'bold', marginBottom: 4 }}>LLM Analysis:</div>
-                <div style={{ fontSize: 13 }}>{alert.llm_reasoning}</div>
+              <div style={{
+                marginBottom: 16,
+                padding: 14,
+                background: palette.bg,
+                borderRadius: 0,
+                border: `1px solid ${palette.border}`,
+              }}>
+                <div style={{
+                  fontWeight: 700,
+                  marginBottom: 6,
+                  fontFamily: font.mono,
+                  fontSize: '0.65rem',
+                  color: palette.info,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                }}>🤖 LLM Analysis</div>
+                <div style={{
+                  fontSize: '0.75rem',
+                  fontFamily: font.mono,
+                  color: palette.text,
+                  lineHeight: '1.6',
+                }}>{alert.llm_reasoning}</div>
               </div>
             )}
 
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 'bold', marginBottom: 4 }}>Recommended Action:</div>
-              <div style={{ fontSize: 14 }}>{alert.recommended_action || 'monitor'}</div>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{
+                fontWeight: 700,
+                marginBottom: 6,
+                fontFamily: font.mono,
+                fontSize: '0.65rem',
+                color: palette.textMuted,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+              }}>Recommended Action</div>
+              <div style={{
+                fontSize: '0.8rem',
+                fontFamily: font.mono,
+                color: palette.warn,
+                fontWeight: 600,
+              }}>{alert.recommended_action || 'monitor'}</div>
             </div>
 
             {alert.features && Object.keys(alert.features).length > 0 && (
-              <div style={{ marginTop: 12, padding: 12, background: '#f8f9fa', borderRadius: 4 }}>
-                <div style={{ fontWeight: 'bold', marginBottom: 8 }}>Behavioral Features:</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, fontSize: 13 }}>
+              <div style={{
+                marginTop: 16,
+                padding: 14,
+                background: palette.bg,
+                borderRadius: 0,
+                border: `1px solid ${palette.border}`,
+              }}>
+                <div style={{
+                  fontWeight: 700,
+                  marginBottom: 10,
+                  fontFamily: font.mono,
+                  fontSize: '0.65rem',
+                  color: palette.textMuted,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                }}>📊 Behavioral Features</div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: 10,
+                  fontSize: '0.75rem',
+                }}>
                   {Object.entries(alert.features).map(([key, value]) => (
-                    <div key={key}>
-                      <span style={{ color: '#666' }}>{key.replace(/_/g, ' ')}:</span>{' '}
-                      <strong>{typeof value === 'number' ? value.toFixed(2) : value}</strong>
+                    <div key={key} style={{ fontFamily: font.mono }}>
+                      <span style={{ color: palette.textMuted }}>
+                        {key.replace(/_/g, ' ')}:
+                      </span>{' '}
+                      <strong style={{ color: palette.text }}>
+                        {typeof value === 'number' ? value.toFixed(2) : value}
+                      </strong>
                     </div>
                   ))}
                 </div>
@@ -291,14 +542,36 @@ export default function AlertList() {
             )}
 
             {alert.video_clip_url && (
-              <div style={{ marginTop: 12 }}>
+              <div style={{ marginTop: 16 }}>
                 <a
                   href={alert.video_clip_url}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ color: '#007bff', textDecoration: 'none' }}
+                  style={{
+                    color: palette.info,
+                    textDecoration: 'none',
+                    fontFamily: font.mono,
+                    fontSize: '0.75rem',
+                    letterSpacing: '0.05em',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '8px 12px',
+                    border: `1px solid ${palette.info}`,
+                    borderRadius: 0,
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.background = palette.info;
+                    e.target.style.color = palette.bg;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.background = 'transparent';
+                    e.target.style.color = palette.info;
+                  }}
                 >
-                  View Video Clip →
+                  🎥 View Video Clip →
                 </a>
               </div>
             )}
@@ -306,23 +579,67 @@ export default function AlertList() {
         ))}
 
         {loading && (
-          <div style={{ textAlign: 'center', padding: 20, color: '#666' }}>
+          <div style={{
+            textAlign: 'center',
+            padding: 30,
+            color: palette.textMuted,
+            fontFamily: font.mono,
+            fontSize: '0.75rem',
+            letterSpacing: '0.08em',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+          }}>
+            <div style={{
+              width: 20,
+              height: 20,
+              border: `2px solid ${palette.border}`,
+              borderTopColor: palette.info,
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+            }} />
             Loading more alerts...
           </div>
         )}
 
         {!loading && !hasMore && alerts.length > 0 && (
-          <div style={{ textAlign: 'center', padding: 20, color: '#666' }}>
-            No more alerts to load
+          <div style={{
+            textAlign: 'center',
+            padding: 30,
+            color: palette.textMuted,
+            fontFamily: font.mono,
+            fontSize: '0.7rem',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            borderTop: `1px solid ${palette.border}`,
+          }}>
+            ─── End of alerts ───
           </div>
         )}
 
         {!loading && alerts.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
-            No alerts found
+          <div style={{
+            textAlign: 'center',
+            padding: 60,
+            color: palette.textMuted,
+            fontFamily: font.mono,
+            fontSize: '0.85rem',
+            letterSpacing: '0.05em',
+          }}>
+            <div style={{ fontSize: '3rem', marginBottom: 16, opacity: 0.3 }}>📭</div>
+            <div>No alerts found</div>
           </div>
         )}
       </div>
+
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
