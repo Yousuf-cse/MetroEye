@@ -39,9 +39,18 @@ app.use((req, res, next) => {
 });
 
 // Database connection
+console.log('🔗 Connecting to MongoDB:', process.env.MONGODB_URI);
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('✅ MongoDB connected'))
-  .catch(err => console.error('❌ MongoDB connection error:', err));
+  .then(() => {
+    console.log('✅ MongoDB connected successfully');
+    console.log('📂 Database:', mongoose.connection.name);
+    console.log('🔗 Host:', mongoose.connection.host);
+    console.log('🔌 Port:', mongoose.connection.port);
+  })
+  .catch(err => {
+    console.error('❌ MongoDB connection FAILED:', err.message);
+    console.error('Full error:', err);
+  });
 
 // Routes
 app.get('/', (req, res) => {

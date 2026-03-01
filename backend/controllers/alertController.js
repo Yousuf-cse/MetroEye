@@ -1,31 +1,25 @@
 const Alert = require('../models/Alert');
 const alertService = require('../services/alertService');
 
-// CREATE ALERT FROM DETECTION (with threshold-based routing)
+// CREATE ALERT FROM DETECTION (Python already did threshold routing)
 // This is the main entry point for alerts from the vision engine
+// Python sends alerts that have ALREADY been analyzed (fast-path or LLM-path)
 exports.createAlertFromDetection = async (req, res) => {
   try {
     const detectionData = req.body;
+    const llmAnalysis = detectionData.llm_analysis || {};
+    const llmUsed = llmAnalysis.llm_used || false;
 
-    console.log(`📥 Received detection: Track ${detectionData.track_id}, Risk ${detectionData.risk_score}`);
+    console.log(`📥 Received alert from Python: Track ${detectionData.track_id}, Risk ${detectionData.risk_score}, LLM: ${llmUsed ? 'YES' : 'NO (fast-path)'}`);
 
-    // Process through alert service (handles fast-path vs LLM-path routing)
-    const alert = await alertService.processDetection(detectionData, req.io);
-
-    if (!alert) {
-      // Below threshold - no alert created
-      return res.json({
-        success: true,
-        message: 'Detection processed, no alert created (below threshold)',
-        data: null
-      });
-    }
+    // Python already processed this - just save and broadcast
+    const alert = await alertService.createFromPython(detectionData, req.io);
 
     res.status(201).json({
       success: true,
       message: 'Alert created successfully',
       data: alert,
-      path: alert.risk_score >= 85 ? 'fast-path' : 'llm-path'
+      path: llmUsed ? 'llm-path' : 'fast-path'
     });
 
   } catch (error) {

@@ -64,7 +64,7 @@ class RuleBasedScorer:
 
         # Max possible score (sum of all rule weights)
         # LEARNING: We use this to normalize confidence (score / max_score)
-        self.max_score = 120  # Updated for new rules (phone usage + acceleration)
+        self.max_score = 260  # Updated for ALL rules including critical distress indicators
 
         print("✓ RuleBasedScorer initialized")
         print(f"  Thresholds: {self.thresholds}")
@@ -204,6 +204,65 @@ class RuleBasedScorer:
             score += 10
             triggered_rules.append('erratic_movement')
 
+        # ===== Rule 8: Edge Transgression Count (CRITICAL!) =====
+        # LEARNING: "Hesitation Loop" - strongest indicator of suicidal intent
+        # Person repeatedly approaches edge, looks, and steps back
+        # This is THE most psychologically significant pattern
+        edge_transgressions = features.get('edge_transgression_count', 0)
+        if edge_transgressions >= 3:
+            score += 35  # EXTREMELY HIGH WEIGHT - This is critical!
+            triggered_rules.append('multiple_edge_transgressions')
+        elif edge_transgressions >= 2:
+            score += 25
+            triggered_rules.append('edge_transgression_pattern')
+        elif edge_transgressions >= 1:
+            score += 15
+            triggered_rules.append('edge_transgression_detected')
+
+        # ===== Rule 9: Shoulder Hunch (Distress Marker) =====
+        # LEARNING: Extreme hunching or slouching indicates severe stress
+        shoulder_hunch = features.get('shoulder_hunch_index')
+        if shoulder_hunch is not None:
+            if shoulder_hunch < -0.3:  # Hunched up (shoulders near ears)
+                score += 15
+                triggered_rules.append('extreme_tension_posture')
+            elif shoulder_hunch > 0.4:  # Deeply slouched (giving up posture)
+                score += 20  # Higher weight - often precedes crisis
+                triggered_rules.append('defeated_posture')
+
+        # ===== Rule 10: Closed Body Posture (Psychological Withdrawal) =====
+        # LEARNING: Self-hugging, arms crossing - isolation behavior
+        closed_posture = features.get('closed_body_posture', False)
+        if closed_posture:
+            score += 15
+            triggered_rules.append('withdrawn_posture')
+
+        # ===== Rule 11: Hand-to-Face Proximity (Anxiety/Despair) =====
+        # LEARNING: Hands covering face, running through hair = distress
+        hand_face_dist = features.get('hand_to_face_distance')
+        if hand_face_dist is not None and hand_face_dist < 100:
+            score += 15
+            triggered_rules.append('distress_gestures')
+
+        # ===== Rule 12: Track Fixation (Sustained Gaze at Tunnel) =====
+        # LEARNING: Staring at where train will emerge for extended time
+        head_yaw = features.get('head_yaw_angle')
+        # Note: This assumes platform orientation - may need calibration
+        # High absolute yaw = looking toward tunnel entrance
+        if head_yaw is not None and abs(head_yaw) > 45:
+            # Check if person is near edge while fixating
+            min_dist = features.get('min_dist_to_edge')
+            if min_dist is not None and min_dist < 100:
+                score += 25  # CRITICAL: Near edge + fixating on tunnel
+                triggered_rules.append('track_fixation_near_edge')
+
+        # ===== Rule 13: Weight Shifting Variance (Nervous Fidgeting) =====
+        # LEARNING: Rocking, shifting weight = nervous energy, agitation
+        weight_shift_var = features.get('weight_shifting_variance')
+        if weight_shift_var is not None and weight_shift_var > 50:
+            score += 10
+            triggered_rules.append('nervous_fidgeting')
+
         # ===== Compute Confidence =====
         # LEARNING: Confidence = how many rules triggered
         # More rules triggered = more evidence = higher confidence
@@ -212,7 +271,7 @@ class RuleBasedScorer:
         confidence_from_score = min(score / self.max_score, 1.0)
 
         # Method 2: Based on number of triggered rules (more robust)
-        max_possible_rules = 7  # Updated: 5 original + 2 new (phone, acceleration)
+        max_possible_rules = 13  # Total: 7 original + 6 advanced distress indicators
         confidence_from_rules = len(triggered_rules) / max_possible_rules
 
         # Combine both methods (average)

@@ -163,7 +163,79 @@ class AlertService {
   }
 
   /**
-   * Create alert directly from LLM-analyzed data
+   * NEW SIMPLIFIED METHOD: Create alert from Python (already analyzed)
+   * Python has already done threshold routing and LLM analysis (if needed)
+   * Backend just saves and broadcasts
+   *
+   * @param {Object} detectionData - Alert data from Python vision engine
+   * @param {Object} io - Socket.io instance
+   * @returns {Object} Created alert
+   */
+  async createFromPython(detectionData, io) {
+    const {
+      track_id,
+      camera_id,
+      risk_score,
+      risk_level,
+      features,
+      llm_analysis,
+      timestamp
+    } = detectionData;
+
+    // Extract LLM analysis (already done in Python)
+    const analysis = llm_analysis || {};
+
+    const alertData = {
+      alert_id: `ALERT-${uuidv4()}`,
+      timestamp: timestamp ? new Date(timestamp * 1000) : new Date(),
+      camera_id,
+      track_id,
+      risk_level: analysis.risk_level || risk_level || this._getRiskLevel(risk_score),
+      confidence: analysis.confidence || 0.85,
+      risk_score,
+      features: features || {},
+      llm_reasoning: analysis.reasoning || 'Alert processed by vision engine',
+      alert_message: analysis.alert_message || `Alert for track #${track_id}`,
+      recommended_action: analysis.recommended_action || this._determineAction(risk_score),
+      status: 'pending'
+    };
+
+    const alert = new Alert(alertData);
+
+    // Debug logging
+    console.log('💾 Attempting to save alert:', {
+      alert_id: alertData.alert_id,
+      track_id: alertData.track_id,
+      risk_score: alertData.risk_score,
+      camera_id: alertData.camera_id
+    });
+
+    try {
+      await alert.save();
+      const pathType = analysis.llm_used ? 'LLM' : 'FAST';
+      console.log(`✅ ${pathType} PATH alert saved: ${alert.alert_id} (MongoDB ID: ${alert._id})`);
+    } catch (saveError) {
+      console.error('❌ ALERT SAVE FAILED:', saveError.message);
+      if (saveError.errors) {
+        console.error('Validation errors:', JSON.stringify(saveError.errors, null, 2));
+      }
+      throw saveError;
+    }
+
+    // Broadcast via WebSocket
+    if (io) {
+      io.emit('new_alert', {
+        type: 'new_alert',
+        priority: risk_level === 'critical' || risk_level === 'high' ? 'high' : 'normal',
+        data: alert.toObject()
+      });
+    }
+
+    return alert;
+  }
+
+  /**
+   * LEGACY: Create alert directly from LLM-analyzed data
    * Used when vision engine has already processed through LLM
    *
    * @param {Object} llmAlertData - Alert data with LLM reasoning
